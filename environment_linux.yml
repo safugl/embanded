@@ -1,0 +1,11 @@
+name: embanded
+channels:
+  - defaults
+  - conda-forge
+dependencies:
+  - python=3.11.4
+  - numpy=1.24.3
+  - scipy=1.11.1
+  - numba=0.57.0
+  - matplotlib=3.7.1
+  - pip=23.2.1
