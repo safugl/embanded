@@ -1,3 +1,2 @@
 # Examples
-The synthetic datasets used for the examples in the [python](/python/) folder are stored in mat files. These were generated in MATLAB using scripts in the [matlab](/matlab/) folder.
-
+This folder contains Matlab and Python examples. The scripts stored in the Matlab folder simulate data and fit models to the simulated data. The data generated in these simulations are stored as .mat files in the Python folder. The Python scripts exemplifies how one could fit similar models to these data.
