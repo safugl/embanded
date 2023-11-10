@@ -1,3 +1,5 @@
-from embanded.embanded import EMBanded
-from embanded.version import __version__
+"""Initialization file for embanded"""
 
+from .embanded import EMBanded
+
+__version__ = '0.0.2'
