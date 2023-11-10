@@ -1,3 +1,5 @@
+[![Python application](https://github.com/safugl/embanded/actions/workflows/python-app.yml/badge.svg)](https://github.com/safugl/embanded/actions/workflows/python-app.yml)
+
 # embanded
 Expectation-Maximization algorithm for estimating regularized regression model with banded prior structure. Please see [1] as well as [2,3] for more information about "banded-type" regularization. The repository contains MATLAB code and Python code.
 
