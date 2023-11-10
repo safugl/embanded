@@ -31,7 +31,7 @@ This example illustrates how to use the model for estimating temporal response f
 This example uses a synthetic data set to fit a decoding model. The example simulates an envelope and multi-channel response data that contains a mixed version of the envelope. The script fits two different EM-banded decoding models and one Ridge decoding model. The models are used to predict held-out data. The scripts relies on a [function](examples/matlab/func/timelag.m) for augmenting the responses with multiple time lags. The script is available [here](examples/matlab/example_simulation_decoding.m).
 
 ## 4. References
-1. Fuglsang, S. A., et al., "Exploring an EM-algorithm for banded regression in computational neuroscience" 2023. Available at: https://doi.org/10.1101/2023.09.22.558945 
+1. Fuglsang, S. A., Madsen, K. H., Puonti, O., Siebner, H. R., Hjortkjær J. (2023) Exploring an EM-algorithm for banded regression in computational neuroscience. Available at: https://doi.org/10.1101/2023.09.22.558945 
 2. ﻿Nunez-Elizalde AO, Huth AG, Gallant JL (2019) Voxelwise encoding models with non-spherical multivariate normal priors. Neuroimage 197:482–492 Available at: https://doi.org/10.1016/j.neuroimage.2019.04.012.
 3. Dupré la Tour T, Eickenberg M, Nunez-Elizalde AO, Gallant JL (2022) Feature-space selection with banded ridge regression. Neuroimage 264. Available at: https://doi.org/10.1016/j.neuroimage.2022.119728
 4. Broderick, Michael P., et al. "Electrophysiological correlates of semantic dissimilarity reflect the comprehension of natural, narrative speech." Current Biology 28.5 (2018): 803-809. Available here: https://doi.org/10.1016/j.cub.2018.01.080
