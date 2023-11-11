@@ -7,9 +7,13 @@ Expectation-Maximization algorithm for estimating regularized regression model w
 Download the repository and store it in a local folder. Run the [setup.m](setup.m) file. Follow the example scripts available [here](examples/matlab).
 
 ## 2. Python installation
-```
-pip install .
-```
+Install embanded using one of the three following approaches:
+
+1. Install directly from git: `pip install git+https://github.com/safugl/embanded.git` 
+2. Download the repository and run `pip install .`
+3. Install without cloning the repository: `pip install https://resources.drcmr.dk/embanded/embanded-0.0.2-py3-none-any.whl`
+
+Follow the example scripts available [here](examples/python).
 
 ## 3. Examples 
 - Matlab example scripts are available [here](examples/matlab/).
@@ -22,7 +26,7 @@ This example uses synthetic data. Several models are fit to the data using sciki
 <img title="simulated_data" alt="simulated_data" src="./examples/python/example_sklearn_02.png">
 
 ### 3.2. Simulation example with Python
-This example uses a synthetic dataset created by [5] for scikit-learn. A EM-banded model is fit to the data. Separate regularization hyperparameters are declared to each predictor. The figure below has been modified from the tutorial described by [5]. It now also includes weights estimated by two EM-banded estimators. The modified script is available [here](examples/python/example_sklearn_01.py).
+This example uses a synthetic dataset created by [5] for scikit-learn. An EM-banded model is fit to the data. Separate regularization hyperparameters are declared to each predictor. The figure below has been modified from the tutorial described by [5]. It now also includes weights estimated by two EM-banded estimators. The modified script is available [here](examples/python/example_sklearn_01.py).
 
 <img title="sklearn-tutorial" alt="sklearn-tutorial data" src="./examples/python/example_sklearn_01.png">
 
