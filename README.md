@@ -10,7 +10,7 @@ Download the repository and store it in a local folder. Run the [setup.m](setup.
 Install embanded using one of the three following approaches:
 
 1. Install directly from git: `pip install git+https://github.com/safugl/embanded.git` 
-2. Download the repository and run `pip install .`
+2. Download the repository and run `pip install <local project path>`
 3. Install without cloning the repository: `pip install https://resources.drcmr.dk/embanded/embanded-0.0.2-py3-none-any.whl`
 
 Follow the example scripts available [here](examples/python).
@@ -31,7 +31,7 @@ This example uses a synthetic dataset created by [5] for scikit-learn. An EM-ban
 <img title="sklearn-tutorial" alt="sklearn-tutorial data" src="./examples/python/example_sklearn_01.png">
 
 ### 3.3. EEG encoding example with Matlab
-This example illustrates how to use the model for estimating temporal response functions from electroencephalography (EEG) data. The data used for this example is publicly available and was originally described in [4]. The example imports epoched EEG data and envelope features and fits regression models to data from each participant. The scripts relies on a [function](examples/matlab/func/timelag.m) for augmenting the stimulus feature with multiple time lags. The script is available [here](examples/matlab/example_eeg_encoding.m)
+This example illustrates how to use the model for estimating temporal response functions from electroencephalography (EEG) data. The data used for this example is publicly available and was originally described in [4]. The example imports epoched EEG data and envelope features and fits regression models to data from each participant. The scripts relies on a [function](examples/matlab/func/timelag.m) for augmenting the stimulus feature with multiple time lags. The script is available [here](examples/matlab/example_eeg_encoding.m).
 
 ### 3.4. Decoding example using synthetic data with Matlab
 This example uses a synthetic data set to fit a decoding model. The example simulates an envelope and multi-channel response data that contains a mixed version of the envelope. The script fits two different EM-banded decoding models and one Ridge decoding model. The models are used to predict held-out data. The scripts relies on a [function](examples/matlab/func/timelag.m) for augmenting the responses with multiple time lags. The script is available [here](examples/matlab/example_simulation_decoding.m).
