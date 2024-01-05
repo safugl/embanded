@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from sklearn.linear_model import ARDRegression, BayesianRidge
 from sklearn.linear_model import RidgeCV, LassoCV, LinearRegression
 import numpy as np
-import embanded
+from embanded.embanded_numpy import EMBanded
 
 np.random.seed(1)
 
@@ -21,7 +21,7 @@ W = np.concatenate(
 N = np.random.randn(100, 1)/np.sqrt(2)
 Y = X@W + N
 
-emb = embanded.EMBanded(num_features=len(F))
+emb = EMBanded()
 emb.fit(F, Y)
 
 

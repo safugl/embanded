@@ -6,7 +6,7 @@ import sklearn.linear_model
 import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
-import embanded
+from embanded.embanded_numpy import EMBanded
 
 # Load data from the 'example02.mat' file
 data = scipy.io.loadmat('example02.mat')
@@ -31,9 +31,10 @@ alphas = [1e4, 1e3, 1e2, 1e1]
 for k, hv in enumerate([None, 1., 5., 10.]):
 
     # Initialize EM-banded model
-    emb = embanded.EMBanded(num_features=2, hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                            max_iterations=200)
+    emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                   max_iterations=200)
     emb.set_smoothness_param([hv, None])
+    emb.set_verbose(True)
 
     # Fit the model
     emb.fit(F, y)

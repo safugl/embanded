@@ -6,7 +6,7 @@ import sklearn.linear_model
 import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
-import embanded
+from embanded.embanded_numpy import EMBanded
 
 # Load data from the 'example03.mat' file
 data = scipy.io.loadmat('example03.mat')
@@ -33,21 +33,21 @@ f, ax = plt.subplots(2, 4, sharex=True, figsize=(15, 7.5))
 
 for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
 
-    emb = embanded.EMBanded(num_features=num_features, hyper_params=(param, param, param, param),
-                            max_iterations=200)
-
+    emb = EMBanded(hyper_params=(param, param, param, param),
+                   max_iterations=200)
+    emb.set_verbose(True)
     # Fit the model
     emb.fit(F, y)
 
     # Plot the estimated weights for this parameter
     ax[0, k].plot(emb.W, '-k')
-    ax[0,k].set_title(r'$\eta=\phi=\kappa=\tau=%0.1e$'%param)
-    
+    ax[0, k].set_title(r'$\eta=\phi=\kappa=\tau=%0.1e$' % param)
+
     # Check if the estimated weights match the provided data
     assert np.isclose(data['W_estimated'][0, k], emb.W).all(
     ), 'The estimated weights are not matching'
 
-    # As a point of reference, we also fit Ridge models with scikit-learn and 
+    # As a point of reference, we also fit Ridge models with scikit-learn and
     # compare these with the estimates stored in the mat file.
     # Initialize the Ridge regression model with the specified alpha
     ridge = sklearn.linear_model.Ridge(
@@ -58,8 +58,8 @@ for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
 
     # Plot the estimated weights
     ax[1, k].plot(ridge.fit(X, y).coef_.ravel(), '-r')
-    ax[1,k].set_title(r'$\alpha=%0.1e$'%(1./param))
-    
+    ax[1, k].set_title(r'$\alpha=%0.1e$' % (1./param))
+
     # Check if the estimated weights match the provided data
     assert np.isclose(ridge.fit(X, y).coef_.ravel(),
                       data['W_ridge'][0, k].ravel()).all()

@@ -1,28 +1,30 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-@author: sorenaf
-"""
+
 # pylint: skip-file
 import sklearn.linear_model
 import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
-from embanded.embanded_numpy import EMBanded
+import torch
+from embanded.embanded_torch import EMBanded
 
+# Load data from the 'example01.mat' file
+data = scipy.io.loadmat('example01.mat')
 
-# Load data from the 'example06.mat' file
-data = scipy.io.loadmat('example06.mat')
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 # Split the data into predictor groups (F) and target variable (y)
-F = [data['F1'], data['F2']]
-y = data['y']
+F = []
+for key in ['F1','F2','F3']:
+    F.append(torch.from_numpy(data[key]).to(device))
 
+y = torch.from_numpy(data['y']).to(device)
 
 # Check if the predictors and target variable are centered
-assert np.isclose(np.concatenate(F, axis=1).mean(axis=0), 0).all(
+assert np.isclose(torch.concatenate(F, axis=1).mean(axis=0).cpu(), 0).all(
 ), "The predictors have been centered, please see the MATLAB simulations"
-assert np.isclose(y.mean(axis=0), 0).all(
+assert np.isclose(y.mean(axis=0).cpu(), 0).all(
 ), "The target variable has been centered, please see the MATLAB simulations"
 
 
@@ -35,16 +37,16 @@ for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
     # Initialize EM-banded model
     emb = EMBanded(hyper_params=(param, param, param, param),
                    max_iterations=200)
-    emb.set_verbose(True)
+
     # Fit the model
-    emb.fit(F, y)
+    summary = emb.fit(F, y)
 
     # Plot the estimated weights for this parameter
-    ax[0, k].plot(emb.W, '-k')
+    ax[0, k].plot(emb.W.cpu().numpy(), '-k')
     ax[0, k].set_title(r'$\eta=\phi=\kappa=\tau=%0.1e$' % param)
 
     # Check if the estimated weights match the provided data
-    assert np.isclose(data['W_estimated'][0, k], emb.W).all(
+    assert np.isclose(data['W_estimated'][0, k], emb.W.cpu().numpy()).all(
     ), 'The estimated weights are not matching'
 
     # As a point of reference, we also fit Ridge models with scikit-learn and
@@ -54,12 +56,12 @@ for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
         alpha=1./param, fit_intercept=False, solver='cholesky', copy_X=True)
 
     # Concatenate predictors (F) and fit the Ridge regression model
-    X = np.concatenate(F, axis=1)
+    X = torch.concatenate(F, axis=1).cpu().numpy()
 
     # Plot the estimated weights
-    ax[1, k].plot(ridge.fit(X, y).coef_.ravel(), '-r')
+    ax[1, k].plot(ridge.fit(X, y.cpu().numpy()).coef_.ravel(), '-r')
     ax[1, k].set_title(r'$\alpha=%0.1e$' % (1./param))
 
     # Check if the estimated weights match the provided data
-    assert np.isclose(ridge.fit(X, y).coef_.ravel(),
+    assert np.isclose(ridge.fit(X, y.cpu().numpy()).coef_.ravel(),
                       data['W_ridge'][0, k].ravel()).all()

@@ -9,7 +9,7 @@ In the example Comparing Linear Bayesian Regressors
 from matplotlib.colors import SymLogNorm
 import seaborn as sns
 import matplotlib.pyplot as plt
-import embanded
+from embanded.embanded_numpy import EMBanded
 from sklearn.linear_model import ARDRegression, BayesianRidge, LinearRegression
 import pandas as pd
 from sklearn.datasets import make_regression
@@ -40,8 +40,7 @@ F = [X[:, [i]] for i in range(X.shape[1])]
 Fit the model
 """
 
-emb = embanded.EMBanded(num_features=len(
-    F), hyper_params=(1e-4, 1e-4, 1e-4, 1e-4))
+emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4))
 emb.fit(F, y[:, None])
 
 """
@@ -49,8 +48,7 @@ For the sake of completeness we also consider tau=phi=eta=gamma=1e-6
 """
 
 
-emb_alt = embanded.EMBanded(num_features=len(
-    F), hyper_params=(1e-6, 1e-6, 1e-6, 1e-6))
+emb_alt = EMBanded(hyper_params=(1e-6, 1e-6, 1e-6, 1e-6))
 emb_alt.fit(F, y[:, None])
 
 
