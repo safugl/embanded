@@ -4,8 +4,9 @@ import copy
 from absl.testing import absltest
 import numpy as np
 import pytest
-from . import embanded
-from . import model_utils
+from .embanded_numpy import EMBanded
+from . import _numpy_model_utils
+from . import _numpy_linalg_utils
 
 
 class EMBandedTests(absltest.TestCase):
@@ -20,71 +21,62 @@ class EMBandedTests(absltest.TestCase):
             F = [[]]*num_groups
             W = [[]]*num_groups
             for f in range(num_groups):
-                F[f] = np.random.randn(num_obs, 10)
+                F[f] = np.random.randn(num_obs, 5) + 100
                 if np.random.rand(1) < 0.5:
-                    W[f] = np.random.randn(10, 1)
+                    W[f] = np.random.randn(5, 1)
                 else:
-                    W[f] = np.zeros((10, 1))
+                    W[f] = np.zeros((5, 1))
 
             X = np.concatenate(F, axis=1)
             W = np.concatenate(W, axis=0)
             N = np.random.randn(num_obs, 1)*2
             Y = X@W + N
+            X_before = copy.deepcopy(X)
+            Y_before = copy.deepcopy(Y)
             _compare_models(F, Y)
+
+            np.testing.assert_equal(X, X_before)
+            np.testing.assert_equal(Y, Y_before)
 
     def test_fails_hyperparas(self):
         """Tests cases for wrong hyperparameter inputs"""
         with pytest.raises(Exception):
-            embanded.EMBanded(num_features=3,
-                              hyper_params=(-1, 1e-4, 1e-4, 1e-4))
+            EMBanded(hyper_params=(-1, 1e-4, 1e-4, 1e-4))
         with pytest.raises(Exception):
-            embanded.EMBanded(num_features=3,
-                              hyper_params=(0, 1e-4, 1e-4, 1e-4))
+            EMBanded(hyper_params=(0, 1e-4, 1e-4, 1e-4))
 
     def test_fails_smoothness_param(self):
         """Tests cases for wrong smoothness parameter inputs"""
 
         with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=3,
-                                    hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                                    max_iterations=200)
+            emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                           max_iterations=200)
             emb.set_smoothness_param(['str', None, None])
 
         with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=3,
-                                    hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                                    max_iterations=200)
+            emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                           max_iterations=200)
             emb.set_smoothness_param([-1, None, None])
-
-        with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=3,
-                                    hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                                    max_iterations=200)
-            emb.set_smoothness_param([])
 
     def test_fails_input_data(self):
         """Tests cases for wrong input data, F and y."""
 
         with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=3)
+            # F should be a list of matrices
+            emb = EMBanded()
             emb.fit(np.random.randn(100, 10), np.random.randn(100, 1))
 
-        with pytest.raises(Exception):
-            # F should have 3 elements.
-            emb = embanded.EMBanded(num_features=3)
-            F = [np.random.randn(100, 1), np.random.randn(100, 10)]
-            emb.fit(F, np.random.randn(100, 1))
 
         with pytest.raises(Exception):
             # y has too many rows.
-            emb = embanded.EMBanded(num_features=3)
+            emb = EMBanded()
             F = [np.random.randn(100, 1), np.random.randn(100, 10),
                  np.random.randn(100, 10)]
             emb.fit(F, np.random.randn(1000, 1))
 
         with pytest.raises(Exception):
             # y has too many columns.
-            emb = embanded.EMBanded(num_features=3)
+            emb = EMBanded()
             F = [np.random.randn(100, 1), np.random.randn(100, 10),
                  np.random.randn(100, 10)]
             emb.fit(F, np.random.randn(100, 10))
@@ -93,25 +85,20 @@ class EMBandedTests(absltest.TestCase):
         """Tests cases for wrong hyper parameter intializations"""
 
         with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=100)
+            emb = EMBanded()
             emb.set_lambdas_init(1.)
 
         with pytest.raises(Exception):
             np.random.seed(1)
-            emb = embanded.EMBanded(num_features=100)
+            emb = EMBanded()
             emb.set_lambdas_init(np.random.randn(100))
 
         with pytest.raises(Exception):
-            np.random.seed(1)
-            emb = embanded.EMBanded(num_features=100)
-            emb.set_lambdas_init(np.abs(np.random.randn(10))+0.001)
-
-        with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=100)
+            emb = EMBanded()
             emb.set_nu_init(None)
 
         with pytest.raises(Exception):
-            emb = embanded.EMBanded(num_features=100)
+            emb = EMBanded()
             emb.set_multidimensional(None)
 
     def test_compare_with_ols(self):
@@ -128,9 +115,8 @@ class EMBandedTests(absltest.TestCase):
             [np.random.randn(100, 1), np.zeros((100, 1))], axis=0)
         N = np.random.randn(num_obs, 1)*5
         Y = X@W + N + 100
-        emb = embanded.EMBanded(num_features=len(F),
-                                hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                                max_iterations=200)
+        emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                       max_iterations=200)
         emb.fit(F, Y)
 
         # Check deep copies
@@ -171,9 +157,8 @@ class EMBandedTests(absltest.TestCase):
         X = np.random.randn(num_obs, 10) + 1000
         Y = np.random.randn(num_obs, 1)
 
-        emb = embanded.EMBanded(num_features=1,
-                                hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                                max_iterations=200)
+        emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                       max_iterations=200)
         emb.set_store_covariance_terms(True)
         emb.fit([X], Y)
 
@@ -182,10 +167,9 @@ class EMBandedTests(absltest.TestCase):
 
         def compare_estimates(h, A, B, mult_dim):
             """Fit the model using X=A and y=B"""
-            emb_smooth = embanded.EMBanded(num_features=1,
-                                           hyper_params=(
-                                               1e-4, 1e-4, 1e-4, 1e-4),
-                                           max_iterations=200)
+            emb_smooth = EMBanded(hyper_params=(
+                1e-4, 1e-4, 1e-4, 1e-4),
+                max_iterations=200)
             emb_smooth.set_smoothness_param([h])
             emb_smooth.set_store_covariance_terms(True)
             emb_smooth.set_multidimensional(mult_dim)
@@ -216,9 +200,8 @@ class EMBandedTests(absltest.TestCase):
         X = np.random.randn(num_obs, 10) + 100
         Y = np.random.randn(num_obs, 1)
 
-        emb = embanded.EMBanded(num_features=1,
-                                hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                                max_iterations=200)
+        emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                       max_iterations=200)
         emb.set_store_covariance_terms(True)
         emb.fit([X], Y)
 
@@ -235,7 +218,7 @@ class EMBandedTests(absltest.TestCase):
         A2 = copy.deepcopy(A1)
         B = np.random.randn(A1.shape[1])
         np.testing.assert_almost_equal(
-            model_utils.matrix_add_to_diagonal(A1, B), A2+np.diag(B))
+            _numpy_linalg_utils.matrix_add_to_diagonal(A1, B), A2+np.diag(B))
 
     def test_utils_get_diag(self):
         """Test utils. matrix_get_diagonal_elements"""
@@ -244,21 +227,21 @@ class EMBandedTests(absltest.TestCase):
         A1 = X.T@X
         A2 = copy.deepcopy(A1)
         np.testing.assert_almost_equal(
-            model_utils.matrix_get_diagonal_elements(A1), np.diag(A2))
+            _numpy_linalg_utils.matrix_get_diagonal_elements(A1), np.diag(A2))
 
     def test_utils_matrix_inv(self):
         """Test utils. matrix_inv_cholesky"""
 
         X = np.random.randn(10000, 1000)
         A = X.T@X
-        np.testing.assert_almost_equal(model_utils.matrix_inv_cholesky(A),
+        np.testing.assert_almost_equal(_numpy_linalg_utils.matrix_inv_cholesky(A),
                                        np.linalg.inv(A))
 
     def test_utils_matern_type_kernel(self):
         """Test utils. matern_type_kernel"""
 
         h = 1.
-        mat = model_utils.matern_type_kernel(100, h)
+        mat = _numpy_linalg_utils.matern_type_kernel(100, h)
         self.assertEqual(mat.shape[0], 100)
         self.assertEqual(mat.shape[1], 100)
         self.assertGreater(np.min(mat), 0.)
@@ -266,10 +249,10 @@ class EMBandedTests(absltest.TestCase):
     def test_utils_one_hot_encoding(self):
         """Test utils. one_hot_encoding"""
 
-        mat = model_utils.one_hot_encoding(np.arange(10))
+        mat = _numpy_linalg_utils.one_hot_encoding(np.arange(10))
         np.testing.assert_array_equal(mat, np.eye(10))
 
-        mat = model_utils.one_hot_encoding(np.array([0, 0, 0, 1, 2]))
+        mat = _numpy_linalg_utils.one_hot_encoding(np.array([0, 0, 0, 1, 2]))
         self.assertEqual(mat.shape[0], 5)
         self.assertEqual(mat.shape[1], 3)
         np.testing.assert_array_equal(mat.sum(axis=0), np.array([3., 1., 1.]))
@@ -281,7 +264,7 @@ class EMBandedTests(absltest.TestCase):
              np.random.randn(100, 10),
              np.random.randn(100, 5)]
         h = [None, None, None]
-        Omega, Omega_inv = model_utils.prepare_smoothness_cov(F, h)
+        Omega, Omega_inv = _numpy_model_utils.prepare_smoothness_cov(F, h)
         np.testing.assert_array_equal(Omega, np.eye(115))
         np.testing.assert_array_equal(Omega_inv, np.eye(115))
 
@@ -289,8 +272,8 @@ class EMBandedTests(absltest.TestCase):
              np.random.randn(100, 10),
              np.random.randn(100, 5)]
         h = [10., None, None]
-        Omega, Omega_inv = model_utils.prepare_smoothness_cov(F, h)
-        mat = model_utils.matern_type_kernel(100, 10.)
+        Omega, Omega_inv = _numpy_model_utils.prepare_smoothness_cov(F, h)
+        mat = _numpy_linalg_utils.matern_type_kernel(100, 10.)
 
         np.testing.assert_array_equal(Omega[:100, :][:, :100], mat)
         np.testing.assert_array_equal(Omega[100:, :][:, 100:], np.eye(15))
@@ -300,7 +283,7 @@ class EMBandedTests(absltest.TestCase):
 
         tb = (1e-5, 1e-3, 1e-3, 1e-4)
         eta, tau, phi, kappa = (
-            model_utils.get_hyperparams_from_tuple(tb)
+            _numpy_model_utils.get_hyperparams_from_tuple(tb)
         )
 
         self.assertEqual(eta, 1e-5)
@@ -318,11 +301,11 @@ class EMBandedTests(absltest.TestCase):
         X = np.concatenate(F, axis=1)
         covX = X.T@X
         ind = np.concatenate([np.ones(100)*0, np.ones(10), np.ones(5)*2])
-        mat_indexer = model_utils.one_hot_encoding(ind)
+        mat_indexer = _numpy_linalg_utils.one_hot_encoding(ind)
 
         lambdas = np.array([100., 1., 5.])
         Sigma = (
-            model_utils.compute_covariance(
+            _numpy_model_utils.compute_covariance(
                 nu, covX, lambdas, mat_indexer)
         )
 
@@ -332,10 +315,10 @@ class EMBandedTests(absltest.TestCase):
         np.testing.assert_almost_equal(Sigma, ref)
 
         h = [10., None, None]
-        Omega_inv = model_utils.prepare_smoothness_cov(F, h)[1]
+        Omega_inv = _numpy_model_utils.prepare_smoothness_cov(F, h)[1]
 
         Sigma = (
-            model_utils.compute_covariance(
+            _numpy_model_utils.compute_covariance(
                 nu, covX, lambdas, mat_indexer, Omega_inv)
         )
 
@@ -348,33 +331,29 @@ class EMBandedTests(absltest.TestCase):
 def _compare_models(F, y):
     """Fits four models that should yield highly similar results"""
     # Model 1: fastest
-    emb1 = embanded.EMBanded(num_features=len(F),
-                             hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                             max_iterations=200)
+    emb1 = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                    max_iterations=200)
     emb1.set_multidimensional(False)
     emb1.set_store_covariance_terms(True)
     emb1.fit(F, y)
 
     # Model 2: slower
-    emb2 = embanded.EMBanded(num_features=len(F),
-                             hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                             max_iterations=200)
+    emb2 = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                    max_iterations=200)
     emb2.set_multidimensional(True)
     emb2.set_store_covariance_terms(True)
     emb2.fit(F, y)
 
     # Model 3: include Omega ~ np.eye()
-    emb3 = embanded.EMBanded(num_features=len(F),
-                             hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                             max_iterations=200)
+    emb3 = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                    max_iterations=200)
     emb3.set_smoothness_param([0.0001]*len(F))
     emb3.set_store_covariance_terms(True)
     emb3.fit(F, y)
 
     # Model 4: include Omega ~ np.eye()
-    emb4 = embanded.EMBanded(num_features=len(F),
-                             hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-                             max_iterations=200)
+    emb4 = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                    max_iterations=200)
     emb4.set_multidimensional(True)
     emb4.set_smoothness_param([0.0001]*len(F))
     emb4.set_store_covariance_terms(True)

@@ -6,7 +6,7 @@ import sklearn.linear_model
 import scipy.io
 import matplotlib.pyplot as plt
 import numpy as np
-import embanded
+from embanded.embanded_numpy import EMBanded
 
 # Load data from the 'example01.mat' file
 data = scipy.io.loadmat('example01.mat')
@@ -29,8 +29,8 @@ f, ax = plt.subplots(2, 4, sharex=True, figsize=(15, 7.5))
 for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
 
     # Initialize EM-banded model
-    emb = embanded.EMBanded(num_features=3, hyper_params=(param, param, param, param),
-                            max_iterations=200)
+    emb = EMBanded(hyper_params=(param, param, param, param),
+                   max_iterations=200)
 
     # Fit the model
     summary = emb.fit(F, y)
@@ -43,7 +43,7 @@ for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
     assert np.isclose(data['W_estimated'][0, k], emb.W).all(
     ), 'The estimated weights are not matching'
 
-    # As a point of reference, we also fit Ridge models with scikit-learn and 
+    # As a point of reference, we also fit Ridge models with scikit-learn and
     # compare these with the estimates stored in the mat file.
     # Initialize the Ridge regression model with the specified alpha
     ridge = sklearn.linear_model.Ridge(
