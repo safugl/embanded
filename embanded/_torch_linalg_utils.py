@@ -81,3 +81,9 @@ def one_hot_encoding(A, dtype=torch.float64, device='cpu'):
     for j, val in enumerate(categories):
         mat[A == val, j] = 1.
     return mat
+
+
+def matrix_trace_of_product(A, B):
+    """Return torch.trace(A@B)."""
+    # Notice that A and B have to be m × n real matrices
+    return torch.sum(A.T.reshape(-1)*B.reshape(-1))

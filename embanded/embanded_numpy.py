@@ -3,16 +3,15 @@ import copy
 from typing import List, Tuple
 import numpy as np
 
-from .helpers import check_positive_float
-from .helpers import check_input
-from .helpers import check_boolean
-from .helpers import check_smooth_params
+from .helpers import (
+    check_positive_float, check_input, check_boolean, check_smooth_params
+)
 
-from ._numpy_model_utils import prepare_smoothness_cov
-from ._numpy_model_utils import create_matrix_indexer
-from ._numpy_model_utils import fit_model_multidimensional
-from ._numpy_model_utils import fit_model_without_smoothness
-from ._numpy_model_utils import fit_model_with_smoothness
+from ._numpy_model_utils import (
+    prepare_smoothness_cov, create_matrix_indexer,
+    fit_model_multidimensional, fit_model_without_smoothness,
+    fit_model_with_smoothness
+)
 from ._numpy_linalg_utils import matrix_centering
 
 
@@ -25,7 +24,7 @@ class EMBanded:
                             float] = (1e-4, 1e-4, 1e-4, 1e-4),
         max_iterations: int = 200,
     ):
-        """Initialize the instance based on num_features.
+        """Initialize the instance.
 
         Parameters
         ----------

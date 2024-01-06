@@ -5,12 +5,11 @@ import time
 import torch
 
 
-from ._torch_linalg_utils import one_hot_encoding
-from ._torch_linalg_utils import matern_type_kernel
-from ._torch_linalg_utils import matrix_inv_cholesky
-from ._torch_linalg_utils import matrix_get_diagonal_elements
-from ._torch_linalg_utils import matrix_add_to_diagonal
-from ._torch_linalg_utils import matrix_block_indexing
+from ._torch_linalg_utils import (
+    one_hot_encoding, matern_type_kernel, matrix_inv_cholesky,
+    matrix_get_diagonal_elements, matrix_add_to_diagonal,
+    matrix_block_indexing, matrix_trace_of_product
+)
 
 
 def get_hyperparams_from_tuple(hyper_params):
@@ -115,12 +114,6 @@ def compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv=None):
     Sigma = matrix_inv_cholesky(L)
 
     return Sigma
-
-
-def matrix_trace_of_product(A, B):
-    """Return torch.trace(A@B)."""
-    # Notice that A and B have to be m × n real matrices
-    return torch.sum(A.T.reshape(-1)*B.reshape(-1))
 
 
 def fit_model_without_smoothness(X, y,

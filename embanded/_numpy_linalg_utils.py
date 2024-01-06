@@ -23,7 +23,7 @@ def matrix_get_diagonal_elements(A):
 def matrix_inv_cholesky(A):
     """Approximate matrix inverse via the Cholesky decomposition."""
     L = cho_factor(A, lower=True, overwrite_a=False, check_finite=False)
-    return cho_solve(L, np.eye(A.shape[1],dtype=A.dtype),
+    return cho_solve(L, np.eye(A.shape[1], dtype=A.dtype),
                      overwrite_b=False,
                      check_finite=False)
 
@@ -82,3 +82,9 @@ def one_hot_encoding(A, dtype=np.float64):
     for j, val in enumerate(categories):
         mat[A == val, j] = 1.
     return mat
+
+
+def matrix_trace_of_product(A, B):
+    """Return np.trace(A@B)."""
+    # Notice that A and B have to be m × n real matrices
+    return np.sum(A.T.reshape(-1)*B.reshape(-1))

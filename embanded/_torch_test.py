@@ -5,13 +5,7 @@ from absl.testing import absltest
 import numpy as np
 import torch
 import pytest
-#from embanded.embanded_torch import EMBanded
-#from embanded import _numpy_model_utils
-#from embanded import _numpy_linalg_utils
-
 from .embanded_torch import EMBanded
-#from . import _numpy_model_utils
-#from . import _numpy_linalg_utils
 
 
 class EMBandedTests(absltest.TestCase):
