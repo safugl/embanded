@@ -61,9 +61,6 @@ function [W, summary] = embanded(F,y,opts)
 %   use_matrix_inversion_lemma: boolean, default = false
 %      Specify whether the Woodbury Matrix Identity should be used for
 %      computing inv(Sigma).
-%   early_stopping: float, default = []
-%      Specify early stopping threshold based on the absolute difference
-%      between consecutive estimates of lambda and nu.  
 %   remove_intercept : bool, default=false
 %      Whether to remove offsets in X and Y prior to fitting the model. If set
 %      to false, the data will not be transformed prior to model fitting.
@@ -110,7 +107,6 @@ if isfield(opts,'use_matrix_inversion_lemma')==0; opts.use_matrix_inversion_lemm
 % Optional options:
 if isfield(opts,'covX')==0; opts.covX = []; end
 if isfield(opts,'show_progress')==0; opts.show_progress = true; end
-if isfield(opts,'early_stopping')==0; opts.early_stopping = []; end
 if isfield(opts,'remove_intercept')==0; opts.remove_intercept = []; end
 if isfield(opts,'multi_dimensional')==0; opts.multi_dimensional = false; end
 
@@ -344,15 +340,7 @@ for iteration = 1 : opts.max_iterations
             % Display progress
             fprintf('\n At iteration %i, time elapsed: %0.2f',iteration,toc)
         end
-        
-        if ~isempty(opts.early_stopping)
-            
-            if iteration>1
-                if all(abs([summary.lambda(iteration,:)-summary.lambda(iteration-1,:) summary.nu(iteration)-summary.nu(iteration-1)])<opts.early_stopping) 
-                    break
-                end
-            end
-        end
+      
         
     end
     
