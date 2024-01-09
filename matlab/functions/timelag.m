@@ -75,7 +75,7 @@ assert(max(abs(lags))<num_obs,'Lags do not match expectations. Please make sure 
 assert(size(time_window,1)==num_obs, 'The mask does not match expectations. It does not have the same number of rows as X.')
 assert(size(time_window,2)==1, 'The mask does not match expectations. It should be a column vector.')
 assert(islogical(time_window), 'The mask does not match expectations. It should be a logical array.')
-assert(ismatrix(X) & ndims(X)==2, 'The input should be a 2D matrix or a column vector')
+assert(ismatrix(X), 'The input should be a matrix or a column vector')
 
 % Store the output as a cell array
 Y = cell( 1 , num_channels );
