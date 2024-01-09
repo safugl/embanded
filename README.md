@@ -7,13 +7,12 @@ Expectation-Maximization algorithm for estimating regularized regression model w
 Download the repository and store it in a local folder. Run the [setup.m](setup.m) file. Follow the example scripts available [here](examples/matlab).
 
 ## 2. Python installation
-Install embanded using one of the three following approaches:
+Create a conda environment, for example, by using `conda create -n embanded python==3.11 pip`. Activate the new environment with `conda activate embanded`. Install embanded using one of the following approaches:
 
-1. Install directly from git: `pip install git+https://github.com/safugl/embanded.git` 
-2. Download the repository and run `pip install <local project path>`
-3. Install without cloning the repository: `pip install https://resources.drcmr.dk/embanded/embanded-0.0.2-py3-none-any.whl`
+1. Install directly from git: `pip install git+https://github.com/safugl/embanded.git` for minimal installation.  Alternatively, for installing all packages required for the examples use `pip install "embanded[examples] @ git+https://github.com/safugl/embanded@main"`. 
+2. Download the repository, navigate to the directory, and execute `pip install .` for minimal installation.  Alternatively, for installing all packages required for the examples use `pip install ".[examples]"`.
 
-Follow the example scripts available [here](examples/python).
+Follow the example scripts available [here](examples/python). 
 
 ## 3. Examples 
 - Matlab example scripts are available [here](examples/matlab/).

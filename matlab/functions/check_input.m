@@ -18,7 +18,7 @@ end
 
 % ------------------------------------------------------------------------
 % Check options
-fields = {'multi_dimensional','use_matrix_inversion_lemma','show_progress','remove_intercept'};
+fields = {'multi_dimensional','use_matrix_inversion_lemma','show_progress','remove_intercept','store_Sigma'};
 for f = 1 : numel(fields)
     assert(islogical(opts.(fields{f})),sprintf('%s should be a logical',fields{f}))
 end

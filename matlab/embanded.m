@@ -15,8 +15,10 @@ function [W, summary] = embandedb(F,y,opts)
 %      (D_j>=1).
 %   y: vector
 %      A column vector of size (M x 1) where M is the number of samples
-%      (rows). The number of samples should be exactly identical to the
-%      number of rows in each entry in F.
+%      (rows) or a matrix of size (M x P) where P is the number of outcome
+%      variables. The number of samples should be exactly identical to the
+%      number of rows in each entry in F. With multiple outcome variables,
+%      i.e., P>1, one must set opts.multi_dimensional = True.
 %   opts: struct
 %      A struct that is used to specify options.
 %
@@ -71,6 +73,12 @@ function [W, summary] = embandedb(F,y,opts)
 %   multi_dimensional : bool, default=false
 %      Whether to make simplifying assumptions to allow for an efficient
 %      estimation of weights in cases where y has multiple columns.
+%   device : string, default=[]
+%      Set device = 'gpu' to allow for GPU computing (requires 
+%      Parallel Computing Toolbox). When set to empty (default) this will
+%      not be used.
+%   store_Sigma : bool, default=false
+%      Whether or not to store Sigma.
 %
 %
 % How to transform data and ensure that each column has zero-mean?
@@ -424,9 +432,11 @@ end
 
 
 function O = matrix_blockdiag_rotation(A,mat_indexer,B)
-% Takes a vector A and a block diagonal matrix, B, and estimates
-% [A_1'*B_11*A_1, ..., A_f'*B_ff*A_f, ...], where f indicates block 
-% index. If B is empty, then it is assumed to be the identity matrix.
+% Take a vector A of size (D x 1) and a block diagonal matrix, B, of size
+% (D x D) and estimate [A_1'*B_11*A_1, ..., A_f'*B_ff*A_f, ...], where f 
+% indicates block index. If B is empty, then it is assumed to be the 
+% identity matrix. This only works since blocks in B coincides with indexes
+% in mat_indexer. The below examples illustrates this behavior.
 %
 %     Examples
 %     --------
@@ -467,9 +477,12 @@ end
 
 
 function O = matrix_block_trace(A,mat_indexer,B)
-% Takes a matrix A and a block diagonal matrix, B, and estimates
+% Take a matrix A and a block diagonal matrix, B, and estimates
 % [trace(A_1*B_11), ..., trace(A_f*B_ff), ...], where f indicates block 
-% index. If B is empty, then it is assumed to be the identity matrix.
+% index. If B is empty, then it is assumed to be the identity matrix. Both
+% A and B will have size (D x D). This only works since blocks in B 
+% coincides with indexes in mat_indexer. The below examples illustrates 
+% this behavior.
 %
 %     Examples
 %     --------
