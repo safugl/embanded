@@ -231,10 +231,11 @@ class EMBanded:
 
         if self.multi_dimensional is False:
 
-            # The Supplementary Material outlines a model that enables sharing
-            # of covariance terms across outcome variables. When the
-            # multi_dimensional parameter is set to False, we can employ
-            # certain tricks to improve compute time.
+            # This implementation is suitable when y is a matrix of size
+            # [M x 1]. It avoids nested for loops and utilizes vectorized code,
+            # which may improve compute time, especially in scenarios with
+            # many predictor groups and relatively few predictors in each
+            # group.
 
             W, summary, Sigma = (
                 fit_model_vectorized(
@@ -247,9 +248,11 @@ class EMBanded:
 
         elif self.multi_dimensional is True:
 
-            # This implementation works both for diagonal and non-diagonal
-            # covariance terms. It may be slightly slower, but it is useful
-            # when y has multiple outcome variables.
+            # This implementation is applicable for any P > 0, where y is a
+            # matrix of size [M x P]. The implementation involves nested for
+            # loops. It can be efficient when the number of predictor groups
+            # is low, and each group has many predictors.
+
             W, summary, Sigma = (
                 fit_model_multidimensional(
                     X, y, self.hyper_params,

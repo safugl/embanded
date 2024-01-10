@@ -269,12 +269,18 @@ for iteration = 1 : opts.max_iterations
         
         
         % The Supplementary Material outlines a model that enables sharing
-        % of covariance terms across outcome variables. When the
-        % multi_dimensional parameter is set to False, we can employ
-        % certain tricks to improve compute time.
+        % of covariance terms across outcome variables. When the 
+        % opts.multi_dimensional parameter is set to false, the 
+        % implementation utilizes vectorized code.
+      
         if opts.multi_dimensional == false
             
-            % Update each lambda_j parameter.
+            % This implementation is suitable when y is a matrix of size
+            % [M x 1]. It avoids nested for loops and utilizes vectorized 
+            % code, which may improve compute time, especially in scenarios
+            % with many predictor groups and relatively few predictors in
+            % each group.
+            
             if (opts.smoothness_prior == false)
                 % Case without smoothness prior
                 lambdas =  (...
@@ -293,8 +299,11 @@ for iteration = 1 : opts.max_iterations
             
         else
             
-            % When multi_dimensional is set to true, we also consider an
-            % inner loop where we update each lambda parameter.
+            % This implementation is applicable for any P > 0, where y is
+            % a matrix of size [M x P]. The implementation involves nested 
+            % for loops. It can be efficient when the number of predictor 
+            % groups is low, and each group has many predictors.
+            
             for f = 1 : num_features
                 
                 % Find the columns matching the feature space f
@@ -310,6 +319,7 @@ for iteration = 1 : opts.max_iterations
                 % associated with outcome variable p = 1, ..., P. We can
                 % simplify this computation and avoid iterating over all P
                 % variables.
+                
                 if  ~isnan( opts.h(f) )
                     % Case with smoothness prior
                     if size(mu_f,2) > size(mu_f,1)
@@ -326,7 +336,7 @@ for iteration = 1 : opts.max_iterations
                     end
                 end
                 
-                % Update lambda
+                % Update each lambda
                 lambdas(f) = (E + 2 * opts.tau) ./ ( P * D_f + 2 * opts.eta + 2 );
             end
         end
