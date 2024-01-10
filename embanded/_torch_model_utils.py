@@ -7,8 +7,8 @@ import torch
 
 from ._torch_linalg_utils import (
     one_hot_encoding, matern_type_kernel, matrix_inv_cholesky,
-    matrix_get_diagonal_elements, matrix_add_to_diagonal,
-    matrix_block_indexing, matrix_trace_of_product
+    matrix_add_to_diagonal, matrix_block_indexing, matrix_trace_of_product,
+    matrix_blockdiag_rotation, matrix_block_trace,
 )
 
 
@@ -102,13 +102,13 @@ def prepare_smoothness_cov(F, smoothness_param,
 
 def compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv=None):
     """Compute inv( 1/nu  X.T X + L Omega_inv)."""
-    # Create a vector that will form the diagonal elements in the L matrix
-    lambdas_diag = mat_indexer@lambdas
+    # Create a vector that will form the diagonal 1/lambda_j elements
+    lambdas_diag_inv = mat_indexer @ (1./lambdas)
 
     if Omega_inv is not None:
-        L = 1.0 / nu * covX + (1.0/lambdas_diag)[..., None] * Omega_inv
+        L = 1.0 / nu * covX + lambdas_diag_inv[:, None] * Omega_inv
     else:
-        L = matrix_add_to_diagonal(1.0 / nu * covX, 1 / lambdas_diag)
+        L = matrix_add_to_diagonal(1.0 / nu * covX, lambdas_diag_inv)
 
     # Compute Sigma
     Sigma = matrix_inv_cholesky(L)
@@ -116,19 +116,23 @@ def compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv=None):
     return Sigma
 
 
-def fit_model_without_smoothness(X, y,
-                                 hyper_params,
-                                 initialization_params,
-                                 max_iterations,
-                                 mat_indexer,
-                                 verbose):
-    """Fit a model fit without smoothness and assume that y is 1D."""
+def fit_model_vectorized(X, y,
+                         hyper_params,
+                         initialization_params,
+                         max_iterations,
+                         mat_indexer,
+                         Omega_inv,
+                         verbose):
+    """Fit a model and assume that y is 1D."""
     if verbose is True:
-        print('Fitting a model without smoothness, assuming 1D y.')
+        if Omega_inv is None:
+            print('Fitting a model without smoothness, assuming 1D y.')
+        else:
+            print('Fitting a model with smoothness, assuming 1D y.')
 
     covXy = X.T @ y
     covX = X.T @ X
-
+    # covX_flat = covX.T.reshape(-1)
     num_feat = len(initialization_params[0])
     num_obs = X.shape[0]
 
@@ -152,86 +156,7 @@ def fit_model_without_smoothness(X, y,
         start_time = time.time()
 
     # Number of predictors in each group
-    D_j = torch.sum(mat_indexer, axis=0)
-
-    for iteration in range(max_iterations):
-
-        # Store in the summaries
-        summary['lambdas'][iteration, :] = lambdas
-        summary['nu'][iteration] = nu
-
-        # Compute Sigma
-        Sigma = compute_covariance(nu, covX, lambdas, mat_indexer)
-        Sigma_diags = matrix_get_diagonal_elements(Sigma)
-
-        W = 1.0 / nu * torch.matmul(Sigma, covXy)
-
-        if iteration < max_iterations-1:
-
-            lambdas = ((torch.pow(W, 2).T @ mat_indexer + Sigma_diags @
-                        mat_indexer + 2 * tau) / (D_j + 2 * eta + 2)).ravel()
-
-            nu = (
-                (torch.sum(torch.pow(y - X @ W, 2)) +
-                 matrix_trace_of_product(covX, Sigma) + 2 * kappa) /
-                (num_obs + 2 + 2 * phi)
-            )
-
-        if verbose is True:
-            print(f'At iteration {iteration} of {max_iterations}')
-            time_elapsed = time.time()-start_time
-            print(f'Time elapsed: {time_elapsed}')
-
-    return W, summary, Sigma
-
-
-def fit_model_with_smoothness(X, y,
-                              hyper_params,
-                              initialization_params,
-                              max_iterations,
-                              mat_indexer,
-                              Omega_inv,
-                              verbose):
-    """Fit model with smoothness constraints and assume that y is 1D."""
-    if verbose is True:
-        print('Fitting a model with smoothness, assuming 1D y.')
-
-    covXy = X.T @ y
-    covX = X.T @ X
-
-    num_feat = len(initialization_params[0])
-    num_obs = X.shape[0]
-
-    # Store lambdas and nu parameters
-    summary = {"lambdas": torch.zeros((max_iterations, num_feat),
-                                      dtype=X.dtype,
-                                      device=X.device),
-               "nu": torch.zeros(max_iterations,
-                                 dtype=X.dtype,
-                                 device=X.device)}
-
-    eta, tau, phi, kappa = get_hyperparams_from_tuple(hyper_params)
-
-    # Initialize the parameters
-    lambdas = copy.deepcopy(initialization_params[0])
-    nu = copy.deepcopy(initialization_params[1])
-
-    if verbose is True:
-        print(f'nu is initialized to {nu}.')
-        print(f'lambdas are initialized to {lambdas}.')
-        start_time = time.time()
-
-    # The number of predictors in each predictor group
     D = torch.sum(mat_indexer, axis=0)
-
-    # Prepare indices for block indexing, and prepare Omega_inv terms for each
-    # predictor group
-    indices = []
-    Omega_inv_groups = []
-    for f in range(mat_indexer.shape[1]):
-        index = torch.where(mat_indexer[:, f] == 1)[0]
-        indices.append(index)
-        Omega_inv_groups.append(matrix_block_indexing(Omega_inv, index))
 
     for iteration in range(max_iterations):
 
@@ -242,34 +167,23 @@ def fit_model_with_smoothness(X, y,
         # Compute Sigma
         Sigma = compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv)
 
+        # Estimate weigths
         W = 1.0 / nu * torch.matmul(Sigma, covXy)
 
         if iteration < max_iterations-1:
 
-            # In this case we also have to iterate over feature groups
-            for f in range(num_feat):
+            # Update the lambdas.
+            lambdas = (
+                (
+                    matrix_blockdiag_rotation(W, mat_indexer, Omega_inv) +
+                    matrix_block_trace(Sigma, mat_indexer, Omega_inv) +
+                    2 * tau) / (D + 2 * eta + 2)
+            ).ravel()
 
-                index = indices[f]
-                D_f = D[f]
-
-                # Get rows in W
-                mu_f = W[index]
-
-                # Get blocks in Sigma and Omega_inv
-                Sigma_ff = matrix_block_indexing(Sigma, index)
-                Omega_inv_ff = Omega_inv_groups[f]
-
-                # Update lambdas
-                lambdas[f] = (
-                    ((mu_f.T @ Omega_inv_ff @ mu_f
-                      + matrix_trace_of_product(Omega_inv_ff, Sigma_ff))
-                     + 2 * tau) / (D_f + 2 * eta + 2))
-
-            # Update nu
             nu = (
                 (torch.sum(torch.pow(y - X @ W, 2)) +
-                 matrix_trace_of_product(covX, Sigma) + 2 * kappa) /
-                (num_obs + 2 + 2 * phi)
+                 matrix_trace_of_product(covX, Sigma) +
+                 2 * kappa) / (num_obs + 2 + 2 * phi)
             )
 
         if verbose is True:
@@ -363,8 +277,12 @@ def fit_model_multidimensional(X, y,
                     Omega_inv_ff = Omega_inv_groups[f]
 
                     # Update with smoothness term
-                    E = (torch.trace(mu_f @ mu_f.T @ Omega_inv_ff) +
-                         matrix_trace_of_product(Omega_inv_ff, Sigma_ff))
+                    if mu_f.shape[1] > mu_f.shape[0]:
+                        E = (torch.trace(mu_f @ mu_f.T @ Omega_inv_ff) +
+                             matrix_trace_of_product(Omega_inv_ff, Sigma_ff))
+                    else:
+                        E = (torch.trace(mu_f.T @ Omega_inv_ff @ mu_f) +
+                             matrix_trace_of_product(Omega_inv_ff, Sigma_ff))
 
                 else:
                     # Update without smoothness
@@ -379,14 +297,14 @@ def fit_model_multidimensional(X, y,
             # Make point-predictions
             prediction = X @ W
 
-            # Flatten prediction and target
-            target = torch.reshape(y, (y.shape[0]*y.shape[1], 1))
-            prediction = torch.reshape(prediction, (y.shape[0]*y.shape[1], 1))
+            # Estimate residual sum of squares
+            rss = torch.sum(torch.pow(y - prediction, 2))
 
             # Update nu
-            nu = ((((target - prediction).T @ (target - prediction)).ravel() +
-                  matrix_trace_of_product(covX, Sigma) + 2 * kappa)
-                  / (num_obs + 2 + 2 * phi))
+            nu = (
+                (rss + matrix_trace_of_product(covX, Sigma) + 2 * kappa)
+                / (num_obs + 2 + 2 * phi)
+            )
 
         if verbose is True:
             print(f'At iteration {iteration} of {max_iterations}')

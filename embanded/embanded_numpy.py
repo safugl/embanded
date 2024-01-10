@@ -9,8 +9,7 @@ from .helpers import (
 
 from ._numpy_model_utils import (
     prepare_smoothness_cov, create_matrix_indexer,
-    fit_model_multidimensional, fit_model_without_smoothness,
-    fit_model_with_smoothness
+    fit_model_multidimensional, fit_model_vectorized,
 )
 from ._numpy_linalg_utils import matrix_centering
 
@@ -209,28 +208,15 @@ class EMBanded:
             # of covariance terms across outcome variables. When the
             # multi_dimensional parameter is set to False, we can employ
             # certain tricks to improve compute time.
-            if self.encourage_smoothness is True:
 
-                # Here we do not assume diagonal covariance.
-                W, summary, Sigma = (
-                    fit_model_with_smoothness(
-                        X, y, self.hyper_params,
-                        initialization_params,
-                        self.max_iterations,
-                        mat_indexer, Omega_inv,
-                        self.verbose)
-                )
-
-            else:
-                # Here we do assume diagonal covariance.
-                W, summary, Sigma = (
-                    fit_model_without_smoothness(
-                        X, y, self.hyper_params,
-                        initialization_params,
-                        self.max_iterations,
-                        mat_indexer,
-                        self.verbose)
-                )
+            W, summary, Sigma = (
+                fit_model_vectorized(
+                    X, y, self.hyper_params,
+                    initialization_params,
+                    self.max_iterations,
+                    mat_indexer, Omega_inv,
+                    self.verbose)
+            )
 
         elif self.multi_dimensional is True:
 

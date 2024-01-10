@@ -1,4 +1,4 @@
-function [W, summary] = embandedb(F,y,opts)
+function [W, summary] = embanded(F,y,opts)
 % Expectation-Maximization algorithm for estimating regularized regression
 % model with banded prior structure.
 %
@@ -74,7 +74,7 @@ function [W, summary] = embandedb(F,y,opts)
 %      Whether to make simplifying assumptions to allow for an efficient
 %      estimation of weights in cases where y has multiple columns.
 %   device : string, default=[]
-%      Set device = 'gpu' to allow for GPU computing (requires 
+%      Set device = 'gpu' to allow for GPU computing (requires
 %      Parallel Computing Toolbox). When set to empty (default) this will
 %      not be used.
 %   store_Sigma : bool, default=false
@@ -271,7 +271,7 @@ for iteration = 1 : opts.max_iterations
         % The Supplementary Material outlines a model that enables sharing
         % of covariance terms across outcome variables. When the
         % multi_dimensional parameter is set to False, we can employ
-        % certain tricks to improve compute time.             
+        % certain tricks to improve compute time.
         if opts.multi_dimensional == false
             
             % Update each lambda_j parameter.
@@ -305,17 +305,25 @@ for iteration = 1 : opts.max_iterations
                 mu_f = W(columns_f,:);
                 Sigma_ff = Sigma(columns_f,columns_f);
                 
-                % Update lambda_f. In this case, mu_f is a real matrix of 
+                % Update lambda_f. In this case, mu_f is a real matrix of
                 % size [D X P], where D is the number of predictors
                 % associated with outcome variable p = 1, ..., P. We can
                 % simplify this computation and avoid iterating over all P
                 % variables.
                 if  ~isnan( opts.h(f) )
                     % Case with smoothness prior
-                    E = trace(mu_f * mu_f' * Omega_inv{f}) + matrix_trace_of_product(Omega_inv{f}, Sigma_ff) * P;
+                    if size(mu_f,2) > size(mu_f,1)
+                        E = trace(mu_f * mu_f' * Omega_inv{f}) + matrix_trace_of_product(Omega_inv{f}, Sigma_ff) * P;
+                    else
+                        E = trace(mu_f' * Omega_inv{f} * mu_f) + matrix_trace_of_product(Omega_inv{f}, Sigma_ff) * P;
+                    end
                 else
                     % Case without smoothness prior
-                    E = trace(mu_f * mu_f') + trace(Sigma_ff) * P;
+                    if size(mu_f,2) > size(mu_f,1)
+                        E = trace(mu_f * mu_f') + trace(Sigma_ff) * P;
+                    else
+                        E = trace(mu_f' * mu_f) + trace(Sigma_ff) * P;
+                    end
                 end
                 
                 % Update lambda
@@ -433,8 +441,8 @@ end
 
 function O = matrix_blockdiag_rotation(A,mat_indexer,B)
 % Take a vector A of size (D x 1) and a block diagonal matrix, B, of size
-% (D x D) and estimate [A_1'*B_11*A_1, ..., A_f'*B_ff*A_f, ...], where f 
-% indicates block index. If B is empty, then it is assumed to be the 
+% (D x D) and estimate [A_1'*B_11*A_1, ..., A_f'*B_ff*A_f, ...], where f
+% indicates block index. If B is empty, then it is assumed to be the
 % identity matrix. This only works since blocks in B coincides with indexes
 % in mat_indexer. The below examples illustrates this behavior.
 %
@@ -445,14 +453,14 @@ function O = matrix_blockdiag_rotation(A,mat_indexer,B)
 %     A = randn(5,1);
 %     B11 = [1:3]'*[1:3];
 %     B22 = sin([1:2])'*sin([1:2]);
-% 
+%
 %     B = [B11, zeros(3,2); ...
 %         zeros(2,3), B22];
-% 
+%
 %     estimate = matrix_blockdiag_rotation(A,mat_indexer,B);
 %     compare = [A(1:3)'*B11*A(1:3), A(4:5)'*B22*A(4:5)];
 %     disp([estimate;  compare])
-%     
+%
 %     estimate = matrix_blockdiag_rotation(A,mat_indexer);
 %     compare = [A(1:3)'*A(1:3), A(4:5)'*A(4:5)];
 %     disp([estimate;  compare])
@@ -467,10 +475,10 @@ assert(size(A,2)==1, 'A has to be a vector of size (M X 1)')
 if ~isempty(B)
     assert(ismatrix(B), 'B has to be a block diagonal matrix of size (M X M)')
     assert(isreal(B), 'Please check A')
-
+    
     O = A'*B*(A.*mat_indexer);
 else
-    O = A'*(A.*mat_indexer);
+    O = sum((A.^2)'*mat_indexer,1);
 end
 
 end
@@ -478,10 +486,10 @@ end
 
 function O = matrix_block_trace(A,mat_indexer,B)
 % Take a matrix A and a block diagonal matrix, B, and estimates
-% [trace(A_1*B_11), ..., trace(A_f*B_ff), ...], where f indicates block 
+% [trace(A_1*B_11), ..., trace(A_f*B_ff), ...], where f indicates block
 % index. If B is empty, then it is assumed to be the identity matrix. Both
-% A and B will have size (D x D). This only works since blocks in B 
-% coincides with indexes in mat_indexer. The below examples illustrates 
+% A and B will have size (D x D). This only works since blocks in B
+% coincides with indexes in mat_indexer. The below examples illustrates
 % this behavior.
 %
 %     Examples
@@ -491,15 +499,15 @@ function O = matrix_block_trace(A,mat_indexer,B)
 %     A = randn(5,1); A = A*A';
 %     B11 = [1:3]'*[1:3];
 %     B22 = sin([1:2])'*sin([1:2]);
-% 
+%
 %     B = [B11, zeros(3,2); ...
 %         zeros(2,3), B22];
-% 
+%
 %     estimate = matrix_block_trace(A,mat_indexer,B);
 %     compare = [trace(A(1:3,1:3)'*B11), trace(A(4:5,4:5)'*B22)];
 %     disp([estimate;  compare])
-% 
-% 
+%
+%
 %     estimate = matrix_block_trace(A,mat_indexer);
 %     compare = [trace(A(1:3,1:3)), trace(A(4:5,4:5))];
 %     disp([estimate;  compare])
@@ -512,7 +520,7 @@ assert(isreal(A), 'Please check A')
 if ~isempty(B)
     assert(ismatrix(B), 'B has to be a block diagonal matrix of size (M X M)')
     assert(isreal(B), 'Please check A')
-
+    
     O = diag(B*A)'*mat_indexer;
 else
     O = diag(A)'*mat_indexer;
