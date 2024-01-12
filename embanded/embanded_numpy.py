@@ -171,7 +171,7 @@ class EMBanded:
         # Combine the features into a matrix.
         X = copy.deepcopy(np.concatenate(F, axis=1))
         y = copy.deepcopy(y)
-        
+
         # Remove offset unless the user have turned this functionality off
         if self.remove_intercept is True:
             X, self.X_offset = matrix_centering(X)
