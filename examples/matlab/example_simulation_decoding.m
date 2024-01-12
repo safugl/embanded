@@ -72,6 +72,7 @@ opts.phi = 1e-4;
 opts.tau = 1e-4;
 opts.eta = 1e-4;
 opts.remove_intercept = true;
+opts.early_stopping_tol = 1e-12;
 [W_model1,summary_model1] = embanded(F,y,opts);
 
 % Check mean values are stored correctly
@@ -94,6 +95,7 @@ opts.phi = 1e-4;
 opts.tau = 1e-4;
 opts.eta = 1e-4;
 opts.remove_intercept = true;
+opts.early_stopping_tol = 1e-12;
 [W_model2,summary_model2] = embanded(F_model2,y,opts);
 
 % Prune the weights for illustration

@@ -79,6 +79,12 @@ function [W, summary] = embanded(F,y,opts)
 %      not be used.
 %   store_Sigma : bool, default=false
 %      Whether or not to store Sigma.
+%   compute_score : bool, default=false
+%      Whether or not to compute and store the objective function in the
+%      summary struct as summary.score.  
+%   early_stopping_tol : float, default = []
+%      Stop early if increases in the objective function are smaller than
+%      this tolerance value. For example, use: early_stopping_tol = 1e-11
 %
 %
 % How to transform data and ensure that each column has zero-mean?
@@ -119,6 +125,8 @@ if isfield(opts,'multi_dimensional')==0; opts.multi_dimensional = false; end
 if isfield(opts,'store_Sigma')==0; opts.store_Sigma = false; end
 if isfield(opts,'use_matrix_inversion_lemma')==0; opts.use_matrix_inversion_lemma = false; end
 if isfield(opts,'device')==0; opts.device = []; end
+if isfield(opts,'compute_score')==0; opts.compute_score = false; end
+if isfield(opts,'early_stopping_tol')==0; opts.early_stopping_tol = []; end
 
 
 
@@ -129,6 +137,14 @@ summary.opts_input = opts;
 % Combine the features into a matrix
 X = cat(2, F{:});
 
+
+
+if opts.use_matrix_inversion_lemma == true
+    I = eye(size(X,1));
+else
+    I = eye(size(X,2));
+end
+    
 if strcmp(opts.device,'gpu')
     X = gpuArray(X);
     y = gpuArray(y);
@@ -138,6 +154,11 @@ if strcmp(opts.device,'gpu')
     opts.eta = gpuArray(opts.eta);
     opts.kappa = gpuArray(opts.kappa);
     opts.phi = gpuArray(opts.phi);
+    I = gpuArray(I);
+end
+
+if ~isempty(opts.early_stopping_tol)
+    opts.compute_score = true;
 end
 
 if opts.remove_intercept == true
@@ -182,16 +203,18 @@ D = sum(mat_indexer,1);
 % Flag to indicate if Omega terms are used
 opts.smoothness_prior = false;
 
-if ~isempty(opts.h)
-    % Proceed if at least one element in h is not NaN
-    if ~all(isnan(opts.h))
-        % Estimate Omega terms and set the smoothness prior flag to true.
-        [Omega_A, Omega_A_inv,~,Omega_inv] = estomega(opts.h,F,opts.device);
-        opts.smoothness_prior = true;
-        
+% Proceed if at least one element in h is not NaN
+if ~isempty(opts.h) & ~all(isnan(opts.h))
+    % Estimate Omega terms and set the smoothness prior flag to true.
+    [Omega_A, Omega_A_inv,~,Omega_inv] = estomega(opts.h,F,opts.device);
+    opts.smoothness_prior = true;
+    
+    if opts.compute_score
+        logdetOmega = matrix_cholesky_logdet(Omega_A);
     end
 else
     opts.h = nan(1,num_features);
+    logdetOmega = 0;
 end
 
 
@@ -200,6 +223,7 @@ end
 nu = opts.nu;
 lambdas = opts.lambdas;
 covXy = X'*y;
+score = nan(opts.max_iterations,1);
 
 % Check if covX is provided; if yes, there's no need to compute X'*X again.
 % Additionally, if the intention is to use the Woodbury matrix inversion
@@ -221,6 +245,7 @@ end
 
 
 
+
 % Do the EM iterations
 for iteration = 1 : opts.max_iterations
     
@@ -232,38 +257,82 @@ for iteration = 1 : opts.max_iterations
     % Create a vector that contains the diagonal elements, lambda_j.
     lambdas_diag = lambdas * mat_indexer';
     
+ 
+    
     % Compute Sigma
-    if ~opts.use_matrix_inversion_lemma
+    if ~opts.use_matrix_inversion_lemma        
         if ~opts.smoothness_prior
             % Case without smoothness prior
-            Sigma = matrix_inv_cholesky(1/nu * covX + diag(1./lambdas_diag),[],opts.device);
+            L = diag(1./lambdas_diag);
         else
             % Case with smoothness prior
-            Sigma = matrix_inv_cholesky(1/nu * covX + (1./lambdas_diag) .* Omega_A_inv,[],opts.device);
+            L = (1./lambdas_diag) .* Omega_A_inv;
         end
-    end
-    
-    % Compute Sigma using the Woodbury matrix inversion formula.
-    if opts.use_matrix_inversion_lemma
-        if strcmp(opts.device,'gpu')
-            I = eye(num_obs,'gpuArray');
-        else
-            I = eye(num_obs);
-        end
-        
+        [Sigma, logdetSigma] = ...
+            matrix_cholesky_solve(1/nu * covX + L, I, opts.compute_score);
+    else
+        % Compute Sigma using the Woodbury matrix inversion lemma.
         if ~opts.smoothness_prior
             % Case without smoothness prior
             L = diag(lambdas_diag);
-            Sigma = L - L*X'* matrix_inv_cholesky(nu * I + X*L*X', X*L);
         else
             % Case with smoothness prior
             L = (lambdas_diag) .* Omega_A;
-            Sigma = L - L*X'* matrix_inv_cholesky(nu * I + X*L*X', X*L);
+        end
+        Sigma = L - L*X'* matrix_cholesky_solve(nu * I + X*L*X', X*L);
+    
+
+        if opts.compute_score 
+            logdetSigma = matrix_cholesky_logdet(Sigma);
+        else
+            logdetSigma = [];
         end
     end
     
     % Estimate weights
     W = 1 / nu * (Sigma * covXy);
+    
+    % Make point-predictions
+    prediction = X * W;
+     
+    % Estimate residual sum of squares and store residuals.
+    if opts.multi_dimensional
+        residuals = reshape(y,num_obs*P,1) - reshape(prediction,num_obs*P,1);
+        rss = sum(residuals.^2);
+    else
+        residuals = y - prediction;
+        rss = sum(residuals.^2);
+    end
+    
+    
+    if opts.compute_score
+        % Estimate the objective function. Break it down into terms for
+        % readability.
+        term_logdetLambda = logdetOmega  + sum(log(lambdas_diag));        
+        term_mlik = -1/2 * 1./nu * y' * residuals + 1/2 * logdetSigma + ...
+            -1/2 * term_logdetLambda - 1/2 * P * num_obs * log(nu);
+        term_lambda  = sum(log(1./(lambdas.^(1+opts.eta)))) ...
+            - sum(opts.tau./lambdas);
+        term_nu  = log(1./(nu.^(1+opts.phi))) - opts.kappa / nu;
+        
+        % Store objective at each iteration
+        score(iteration) = term_mlik + term_lambda + term_nu;
+    end
+
+    if ~isempty(opts.early_stopping_tol)
+
+        if iteration > 1
+            score_diff = score(iteration) - score(iteration-1);
+            
+            % Stop early if the difference between current and previous
+            % estimate is smaller than opts.early_stopping_tol
+            if score_diff < opts.early_stopping_tol
+                break
+            end
+        end
+
+    end
+
     
     if iteration <= opts.max_iterations - 1
         
@@ -341,16 +410,7 @@ for iteration = 1 : opts.max_iterations
             end
         end
         
-        % Make point-predictions
-        prediction = X * W;
         
-        
-        % Estimate residual sum of squares
-        if opts.multi_dimensional
-            rss = sum((reshape(y,num_obs*P,1) - reshape(prediction,num_obs*P,1)).^2);
-        else
-            rss = sum((y - prediction).^2);
-        end
         
         % Update nu.
         if  opts.use_matrix_inversion_lemma == false
@@ -375,6 +435,10 @@ end
 
 if opts.store_Sigma
     summary.Sigma = Sigma;
+end
+
+if opts.compute_score
+    summary.score = score;
 end
 
 end
@@ -418,10 +482,10 @@ for f = 1 : num_features
         % If opts.h(f) is a scalar then define Omega as follows:
         if strcmp(device,'gpu')
             Omega{f} = gpuArray(matern_type_kernel(D_j, h(f)));
-            Omega_i{f} = matrix_inv_cholesky(Omega{f}, eye(D_j,'gpuArray'));
+            Omega_i{f} = matrix_cholesky_solve(Omega{f}, eye(D_j,'gpuArray'));
         else
             Omega{f} = matern_type_kernel(D_j, h(f));
-            Omega_i{f} = matrix_inv_cholesky(Omega{f});
+            Omega_i{f} = matrix_cholesky_solve(Omega{f}, eye(D_j));
         end
         
     else

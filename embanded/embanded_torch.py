@@ -194,7 +194,8 @@ class EMBanded:
         self.num_features = len(F)
 
         # Combine the features into a matrix.
-        X = torch.concatenate(F, axis=1)
+        X = torch.clone(torch.concatenate(F, axis=1))
+        y = torch.clone(y)
 
         # Remove offset unless the user have turned this functionality off.
         if self.remove_intercept is True:
