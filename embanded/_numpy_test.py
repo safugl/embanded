@@ -1,4 +1,4 @@
-"""Code to test EMBanded"""
+# pylint: skip-file
 
 import copy
 from absl.testing import absltest
@@ -58,7 +58,7 @@ class EMBandedTests(absltest.TestCase):
                            max_iterations=200)
             emb.set_smoothness_param([-1, None, None])
 
-    def test_fails_input_data(self):
+    def test_fails_input_data1(self):
         """Tests cases for wrong input data, F and y."""
 
         with pytest.raises(Exception):
@@ -66,7 +66,8 @@ class EMBandedTests(absltest.TestCase):
             emb = EMBanded()
             emb.fit(np.random.randn(100, 10), np.random.randn(100, 1))
 
-
+    def test_fails_input_data2(self):
+        """Tests cases for wrong input data, F and y."""
         with pytest.raises(Exception):
             # y has too many rows.
             emb = EMBanded()
@@ -74,6 +75,8 @@ class EMBandedTests(absltest.TestCase):
                  np.random.randn(100, 10)]
             emb.fit(F, np.random.randn(1000, 1))
 
+    def test_fails_input_data3(self):
+        """Tests cases for wrong input data, F and y."""
         with pytest.raises(Exception):
             # y has too many columns.
             emb = EMBanded()
@@ -234,7 +237,8 @@ class EMBandedTests(absltest.TestCase):
 
         X = np.random.randn(10000, 1000)
         A = X.T@X
-        np.testing.assert_almost_equal(_numpy_linalg_utils.matrix_inv_cholesky(A),
+        O, __ = _numpy_linalg_utils.matrix_inv_cholesky(A)
+        np.testing.assert_almost_equal(O,
                                        np.linalg.inv(A))
 
     def test_utils_matern_type_kernel(self):
@@ -302,30 +306,123 @@ class EMBandedTests(absltest.TestCase):
         covX = X.T@X
         ind = np.concatenate([np.ones(100)*0, np.ones(10), np.ones(5)*2])
         mat_indexer = _numpy_linalg_utils.one_hot_encoding(ind)
-
         lambdas = np.array([100., 1., 5.])
-        Sigma = (
-            _numpy_model_utils.compute_covariance(
-                nu, covX, lambdas, mat_indexer)
-        )
+        lambdas_diag = mat_indexer @ lambdas
 
+        """ Compare without smoothness term """
+        Sigma, __ = _numpy_model_utils.compute_covariance(
+            nu, covX, lambdas_diag)
         dummy = np.concatenate([np.ones(100)*100., np.ones(10), np.ones(5)*5.])
         ref = np.linalg.inv(1/nu*covX+np.diag(1./dummy))
-
         np.testing.assert_almost_equal(Sigma, ref)
 
+        """ Compare with smoothness term """
         h = [10., None, None]
         Omega_inv = _numpy_model_utils.prepare_smoothness_cov(F, h)[1]
-
-        Sigma = (
-            _numpy_model_utils.compute_covariance(
-                nu, covX, lambdas, mat_indexer, Omega_inv)
-        )
-
-        dummy = np.concatenate([np.ones(100)*100., np.ones(10), np.ones(5)*5.])
+        Sigma, __ = _numpy_model_utils.compute_covariance(nu, covX, lambdas_diag,
+                                                          Omega_inv)
         ref = np.linalg.inv(1/nu*covX+np.diag(1./dummy)@Omega_inv)
-
         np.testing.assert_almost_equal(Sigma, ref)
+
+    def test_multidim(self):
+        """Compare with reference estimates."""
+        def comparisons(num_obs, num_dim, P):
+            """ Compare with the following:
+            rand('twister', 1337);
+            X = norminv(rand(num_obs,num_dim),0,1);
+            Y = X(:,1) + norminv(rand(num_obs,P),0,1);
+            F = {X(:,1:4), X(:,5:end)}; 
+            """
+            from scipy.stats import norm
+            np.random.seed(1337)
+            X = norm.ppf(np.random.random((num_dim, num_obs)).T)
+            N = norm.ppf(np.random.random((P, num_obs)).T)
+            Y = X[:, [0]] + N
+            F = [X[:, :4], X[:, 4:]]
+            return F, Y
+
+        F, Y = comparisons(128, 8, 1)
+
+        for multi_dim in [True, False]:
+            for smooth in [None, [0.0001, 0.0001]]:
+                emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                               max_iterations=200)
+                emb.set_multidimensional(multi_dim)
+                if smooth:
+                    emb.set_smoothness_param(smooth)
+                emb.set_compute_score(True)
+                emb.fit(F, Y)
+
+                reference = dict()
+                reference['lambdas'] = [0.124752421156323, 0.000099481704179]
+                reference['nu'] = 1.016172147103439
+                reference['score'] = -62.375380659874189
+
+                for key in ['lambdas', 'nu', 'score']:
+                    np.testing.assert_almost_equal(
+                        reference[key], emb.summary[key][-1])
+
+        F, Y = comparisons(128, 256, 1)
+
+        for multi_dim in [True, False]:
+            for smooth in [None, [0.0001, 0.0001]]:
+                emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                               max_iterations=200)
+                emb.set_multidimensional(multi_dim)
+                if smooth:
+                    emb.set_smoothness_param(smooth)
+                emb.set_compute_score(True)
+                emb.fit(F, Y)
+
+                reference = dict()
+                reference['lambdas'] = [0.170212040035268, 0.000122737436378]
+                reference['nu'] = 0.828597806038281
+                reference['score'] = -52.269084551054725
+
+                for key in ['lambdas', 'nu', 'score']:
+                    np.testing.assert_almost_equal(
+                        reference[key], emb.summary[key][-1])
+
+        F, Y = comparisons(128, 256, 1)
+
+        for multi_dim in [True, False]:
+            for smooth in [None, [0.0001, 0.0001]]:
+                emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                               max_iterations=200)
+                emb.set_multidimensional(multi_dim)
+                if smooth:
+                    emb.set_smoothness_param(smooth)
+                emb.set_compute_score(True)
+                emb.fit(F, Y)
+
+                reference = dict()
+                reference['lambdas'] = [0.170212040035268, 0.000122737436378]
+                reference['nu'] = 0.828597806038281
+                reference['score'] = -52.269084551054725
+
+                for key in ['lambdas', 'nu', 'score']:
+                    np.testing.assert_almost_equal(
+                        reference[key], emb.summary[key][-1])
+
+        F, Y = comparisons(128, 8, 1000)
+
+        for smooth in [None, [0.0001, 0.0001]]:
+            emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+                           max_iterations=200)
+            emb.set_multidimensional(True)
+            if smooth:
+                emb.set_smoothness_param(smooth)
+            emb.set_compute_score(True)
+            emb.fit(F, Y)
+
+            reference = dict()
+            reference['lambdas'] = [0.250738415633565, 0.000385719557023]
+            reference['nu'] = 0.994101490100018
+            reference['score'] = -7.068875711264722e+04
+
+            for key in ['lambdas', 'nu', 'score']:
+                np.testing.assert_almost_equal(
+                    reference[key], emb.summary[key][-1])
 
 
 def _compare_models(F, y):
@@ -335,6 +432,7 @@ def _compare_models(F, y):
                     max_iterations=200)
     emb1.set_multidimensional(False)
     emb1.set_store_covariance_terms(True)
+    emb1.set_compute_score(True)
     emb1.fit(F, y)
 
     # Model 2: slower

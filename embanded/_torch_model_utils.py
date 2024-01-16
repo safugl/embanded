@@ -2,12 +2,12 @@
 
 import copy
 import time
+import math
 import torch
-
 
 from ._torch_linalg_utils import (
     one_hot_encoding, matern_type_kernel, matrix_inv_cholesky,
-    matrix_add_to_diagonal, matrix_block_indexing, matrix_trace_of_product,
+    matrix_block_indexing, matrix_trace_of_product,
     matrix_blockdiag_rotation, matrix_block_trace,
 )
 
@@ -86,7 +86,7 @@ def prepare_smoothness_cov(F, smoothness_param,
 
             # When h[j] is a scalar then define Omega as follows:
             Omega_j = matern_type_kernel(D_j, h_j, device=device, dtype=dtype)
-            Omega_j_inv = matrix_inv_cholesky(Omega_j)
+            Omega_j_inv, __ = matrix_inv_cholesky(Omega_j)
 
         Omega.append(Omega_j)
         Omega_inv.append(Omega_j_inv)
@@ -100,20 +100,23 @@ def prepare_smoothness_cov(F, smoothness_param,
     return Omega, Omega_inv
 
 
-def compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv=None):
-    """Compute inv( 1/nu  X.T X + L Omega_inv)."""
-    # Create a vector that will form the diagonal 1/lambda_j elements
-    lambdas_diag_inv = mat_indexer @ (1./lambdas)
+def compute_covariance(nu, covX, lambdas_diag,
+                       Omega_inv=None, compute_score=False):
+    """Compute inv( 1/nu  X.T X + L Omega_inv) as well as logdet."""
 
     if Omega_inv is not None:
-        L = 1.0 / nu * covX + lambdas_diag_inv[:, None] * Omega_inv
+        # Case with smoothness prior
+        Lambda_inv = (1./lambdas_diag)[:, None] * Omega_inv
     else:
-        L = matrix_add_to_diagonal(1.0 / nu * covX, lambdas_diag_inv)
+        # Case without smoothness prior
+        Lambda_inv = torch.diag(1./lambdas_diag)
 
-    # Compute Sigma
-    Sigma = matrix_inv_cholesky(L)
+    # Estimate Sigma.
+    Sigma, logdet = (
+        matrix_inv_cholesky(1.0 / nu * covX + Lambda_inv, compute_score)
+    )
 
-    return Sigma
+    return Sigma, logdet
 
 
 def fit_model_vectorized(X, y,
@@ -122,6 +125,7 @@ def fit_model_vectorized(X, y,
                          max_iterations,
                          mat_indexer,
                          Omega_inv,
+                         compute_score,
                          verbose):
     """Fit a model and assume that y is 1D."""
     if verbose is True:
@@ -129,12 +133,17 @@ def fit_model_vectorized(X, y,
             print('Fitting a model without smoothness, assuming 1D y.')
         else:
             print('Fitting a model with smoothness, assuming 1D y.')
+    if compute_score is True:
+        logdetOmega = 0
+        if Omega_inv is not None:
+            logdetOmega = -torch.linalg.slogdet(Omega_inv)[1]  # pylint: disable=E1102
 
     covXy = X.T @ y
     covX = X.T @ X
-    # covX_flat = covX.T.reshape(-1)
+
     num_feat = len(initialization_params[0])
     num_obs = X.shape[0]
+    P = y.shape[1]
 
     # Store lambdas and nu parameters
     summary = {"lambdas": torch.zeros((max_iterations, num_feat),
@@ -142,7 +151,10 @@ def fit_model_vectorized(X, y,
                                       device=X.device),
                "nu": torch.zeros(max_iterations,
                                  dtype=X.dtype,
-                                 device=X.device)}
+                                 device=X.device),
+               "score": torch.zeros(max_iterations,
+                                    dtype=X.dtype,
+                                    device=X.device)*torch.nan}
 
     eta, tau, phi, kappa = get_hyperparams_from_tuple(hyper_params)
 
@@ -164,11 +176,33 @@ def fit_model_vectorized(X, y,
         summary['lambdas'][iteration, :] = lambdas
         summary['nu'][iteration] = nu
 
+        # Create a vector that will form the diagonal lambda_j elements
+        lambdas_diag = mat_indexer @ lambdas
+
         # Compute Sigma
-        Sigma = compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv)
+        Sigma, logdet = compute_covariance(nu, covX, lambdas_diag,
+                                           Omega_inv, compute_score)
 
         # Estimate weigths
         W = 1.0 / nu * torch.matmul(Sigma, covXy)
+
+        # Estimate residuals
+        residuals = y - X @ W
+
+        if compute_score is True:
+            summary["score"][iteration] = (
+                - 1 / (2 * nu) * torch.sum(y * residuals)
+                - P / 2 * (
+                    + (-1) * logdet
+                    + logdetOmega
+                    + torch.sum(torch.log(lambdas_diag))
+                    + num_obs * math.log(nu)
+                )
+                - torch.sum(torch.log(torch.pow(lambdas, (1 + eta))))
+                - torch.sum(tau / lambdas)
+                - math.log(math.pow(nu, (1 + phi)))
+                - kappa / nu
+            )
 
         if iteration < max_iterations-1:
 
@@ -200,6 +234,7 @@ def fit_model_multidimensional(X, y,
                                max_iterations,
                                mat_indexer,
                                Omega_inv,
+                               compute_score,
                                verbose):
     """Muldimensional model fit with- or without smoothness."""
     if verbose is True:
@@ -207,12 +242,17 @@ def fit_model_multidimensional(X, y,
             print('Fitting a *multi_dimensional* model without smoothness.')
         else:
             print('Fitting a *multi_dimensional* model with smoothness.')
+    if compute_score is True:
+        logdetOmega = 0
+        if Omega_inv is not None:
+            logdetOmega = -torch.linalg.slogdet(Omega_inv)[1]  # pylint: disable=E1102
 
     covXy = X.T @ y
     covX = X.T @ X
 
     num_feat = len(initialization_params[0])
     num_obs = X.shape[0]
+    P = y.shape[1]
 
     # Store lambdas and nu parameters
     summary = {"lambdas": torch.zeros((max_iterations, num_feat),
@@ -220,7 +260,10 @@ def fit_model_multidimensional(X, y,
                                       device=X.device),
                "nu": torch.zeros(max_iterations,
                                  dtype=X.dtype,
-                                 device=X.device)}
+                                 device=X.device),
+               "score": torch.zeros(max_iterations,
+                                    dtype=X.dtype,
+                                    device=X.device)*torch.nan}
 
     eta, tau, phi, kappa = get_hyperparams_from_tuple(hyper_params)
 
@@ -253,11 +296,33 @@ def fit_model_multidimensional(X, y,
         summary['lambdas'][iteration, :] = lambdas
         summary['nu'][iteration] = nu
 
-        # Compute Sigma
-        Sigma = compute_covariance(nu, covX, lambdas, mat_indexer, Omega_inv)
+        # Create a vector that will form the diagonal lambda_j elements
+        lambdas_diag = mat_indexer @ lambdas
 
-        # Compute W
+        # Compute Sigma
+        Sigma, logdet = compute_covariance(nu, covX, lambdas_diag,
+                                           Omega_inv, compute_score)
+
+        # Estimate weigths
         W = 1.0 / nu * torch.matmul(Sigma, covXy)
+
+        # Estimate residuals
+        residuals = y - X @ W
+
+        if compute_score is True:
+            summary["score"][iteration] = (
+                - 1 / (2 * nu) * torch.sum(y * residuals)
+                - P / 2 * (
+                    + (-1) * logdet
+                    + logdetOmega
+                    + torch.sum(torch.log(lambdas_diag))
+                    + num_obs * math.log(nu)
+                )
+                - torch.sum(torch.log(torch.pow(lambdas, (1 + eta))))
+                - torch.sum(tau / lambdas)
+                - math.log(math.pow(nu, (1 + phi)))
+                - kappa / nu
+            )
 
         if iteration < max_iterations-1:
 
@@ -268,42 +333,47 @@ def fit_model_multidimensional(X, y,
                 D_f = D[f]
 
                 # Get rows in W
-                mu_f = W[index]
+                mu_f = W[index, :]
 
                 # Get blocks in Sigma and Omega_inv
                 Sigma_ff = matrix_block_indexing(Sigma, index)
 
+                # Update lambda_f. In this case, W is a real matrix of
+                # size [D X P], where D is the number of predictors
+                # associated with outcome variable p = 1, ..., P.
+
                 if Omega_inv is not None:
+                    # Case with smoothness prior
                     Omega_inv_ff = Omega_inv_groups[f]
 
-                    # Update with smoothness term
                     if mu_f.shape[1] > mu_f.shape[0]:
-                        E = (torch.trace(mu_f @ mu_f.T @ Omega_inv_ff) +
-                             matrix_trace_of_product(Omega_inv_ff, Sigma_ff))
+                        E = (
+                            torch.trace(mu_f @ mu_f.T @ Omega_inv_ff) +
+                            matrix_trace_of_product(Omega_inv_ff, Sigma_ff)*P
+                        )
                     else:
-                        E = (torch.trace(mu_f.T @ Omega_inv_ff @ mu_f) +
-                             matrix_trace_of_product(Omega_inv_ff, Sigma_ff))
+                        E = (
+                            torch.trace(mu_f.T @ Omega_inv_ff @ mu_f) +
+                            matrix_trace_of_product(Omega_inv_ff, Sigma_ff)*P
+                        )
 
                 else:
-                    # Update without smoothness
+                    # Case without smoothness prior
                     E = (
-                        (matrix_trace_of_product(mu_f, mu_f.T) +
-                         torch.trace(Sigma_ff))
+                        matrix_trace_of_product(mu_f, mu_f.T) +
+                        torch.trace(Sigma_ff) * P
                     )
 
-                # Update lambdas
-                lambdas[f] = (E + 2 * tau) / (y.shape[1] * D_f + 2 * eta + 2)
-
-            # Make point-predictions
-            prediction = X @ W
+                # Update each lambda
+                lambdas[f] = (E + 2 * tau) / (P * D_f + 2 * eta + 2)
 
             # Estimate residual sum of squares
-            rss = torch.sum(torch.pow(y - prediction, 2))
+            rss = torch.sum(torch.pow(residuals, 2))
 
             # Update nu
             nu = (
-                (rss + matrix_trace_of_product(covX, Sigma) + 2 * kappa)
-                / (num_obs + 2 + 2 * phi)
+                (rss + P * matrix_trace_of_product(covX, Sigma) + 2 * kappa)
+                / (P * num_obs + 2 + 2 * phi)
             )
 
         if verbose is True:

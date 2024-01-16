@@ -385,11 +385,9 @@ for iteration = 1 : opts.max_iterations
                 mu_f = W(columns_f,:);
                 Sigma_ff = Sigma(columns_f,columns_f);
                 
-                % Update lambda_f. In this case, mu_f is a real matrix of
+                % Update lambda_f. In this case, W is a real matrix of
                 % size [D X P], where D is the number of predictors
-                % associated with outcome variable p = 1, ..., P. We can
-                % simplify this computation and avoid iterating over all P
-                % variables.
+                % associated with outcome variable p = 1, ..., P. 
                 
                 if  ~isnan( opts.h(f) )
                     % Case with smoothness prior

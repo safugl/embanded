@@ -161,6 +161,7 @@ class EMBanded:
         self.verbose = False
         self.smoothness_param = None
         self.num_features = None
+        self.compute_score = False
 
         # Initialize relevant terms
         self.X_offset = None
@@ -244,6 +245,7 @@ class EMBanded:
                     initialization_params,
                     self.max_iterations,
                     mat_indexer, Omega_inv,
+                    self.compute_score,
                     self.verbose)
             )
 
@@ -259,10 +261,10 @@ class EMBanded:
                     X, y, self.hyper_params,
                     initialization_params,
                     self.max_iterations,
-                    mat_indexer, Omega_inv, self.verbose)
-
+                    mat_indexer, Omega_inv,
+                    self.compute_score,
+                    self.verbose)
             )
-
 
         # Store W and the hyper_param summary.
         self.W = W
@@ -344,3 +346,8 @@ class EMBanded:
         self.smoothness_param = val
         if any(val):
             self.encourage_smoothness = True
+
+    def set_compute_score(self, val: bool) -> None:
+        """Specify if log objective should be computed"""
+        check_boolean(val)
+        self.compute_score = val

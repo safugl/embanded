@@ -20,10 +20,43 @@ def matrix_get_diagonal_elements(A):
     return torch.einsum('ii->i', A)
 
 
-def matrix_inv_cholesky(A):
-    """Approximate matrix inverse via the Cholesky decomposition."""
+def matrix_inv_cholesky(A, compute_logdet=False):
+    """Approximate matrix inverse via the Cholesky decomposition.
+
+    Examples
+    --------
+    Define a tensor, A as follows:
+        tensor([[9., 3., 1., 5.],
+                [3., 7., 5., 1.],
+                [1., 5., 9., 2.],
+                [5., 1., 2., 6.]], dtype=torch.float64)
+     
+    A = torch.tensor([[9, 3, 1, 5], [3, 7, 5, 1], 
+                      [1, 5, 9, 2], [5, 1, 2, 6]],dtype=torch.float64)
+    # Check matrix.
+    assert np.isclose(A,A.T).all()
+
+    O, d = matrix_inv_cholesky(A,True)
+    B = np.linalg.inv(A)
+    np.testing.assert_allclose(O,B)
+    np.testing.assert_allclose(d,np.linalg.slogdet(B)[1])
+    np.testing.assert_allclose(d,np.log(np.linalg.det(B)))
+    """
+    if not isinstance(A, torch.Tensor):
+        raise TypeError('{A} must be a positive definite, symmetric matrix')
+    if not A.ndim == 2:
+        raise TypeError('{A} must be a positive definite, symmetric matrix')
+    if not A.shape[0] == A.shape[1]:
+        raise TypeError('{A} must be a positive definite, symmetric matrix')
     L = torch.linalg.cholesky(A)  # pylint: disable=E1102
-    return torch.cholesky_inverse(L)
+    O = torch.cholesky_inverse(L)
+
+    if compute_logdet is True:
+        logdet = - 2 * torch.sum(torch.log(torch.diag(L)))
+    else:
+        logdet = None
+
+    return O, logdet
 
 
 def matrix_centering(A):
@@ -91,7 +124,7 @@ def matrix_trace_of_product(A, B):
 
 def matrix_blockdiag_rotation(A, mat_indexer, B=None):
     """Take a vector A of size (D x 1) and a block diagonal matrix, B, of size
-    (D x D) and estimate [A_1'*B_11*A_1, ..., A_f'*B_ff*A_f, ...], where f 
+    (D x D) and estimate [A_1'@B_11@A_1, ..., A_f'@B_ff@A_f, ...], where f 
     indicates block index. If B is empty, then it is assumed to be the 
     identity matrix. This only works since blocks in B coincides with indexes
     in mat_indexer. The below examples illustrates this behavior.
@@ -161,7 +194,7 @@ def matrix_blockdiag_rotation(A, mat_indexer, B=None):
 
 def matrix_block_trace(A, mat_indexer, B=None):
     """Take a matrix A and a block diagonal matrix, B, and estimate
-    [trace(A_1*B_11), ..., trace(A_f*B_ff), ...], where f indicates block 
+    [trace(A_1@B_11), ..., trace(A_f@B_ff), ...], where f indicates block 
     index. If B is empty, then it is assumed to be the identity matrix. Both
     A and B will have size (D x D). This only works since blocks in B 
     coincides with indexes in mat_indexer. The below examples illustrates 
