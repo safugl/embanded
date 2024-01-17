@@ -176,6 +176,31 @@ class EMBandedTests(absltest.TestCase):
             
             for key in ['lambdas','nu','score']:
                 np.testing.assert_almost_equal(reference[key],emb.summary[key][-1].numpy())
+                
+        F, Y = comparisons(128,8,1)
+        for multi_dim in [True, False]:
+            for smooth in [None, [0.0001, 0.0001]]:
+                # Increase the gamma parameter in this case, and use early 
+                # stopping criterion.
+                emb = EMBanded(hyper_params=(1e-3, 1e-3, 1e-3, 1e-3),
+                               max_iterations=200)
+                emb.set_multidimensional(multi_dim)
+                emb.set_early_stopping_tol(1e-8)
+                if smooth:
+                    emb.set_smoothness_param(smooth)
+                emb.set_compute_score(True)
+                emb.fit(F,Y)
+                
+                # This should stop after 27 iterations 
+                np.testing.assert_equal(27-1, len(emb.summary['score']))
+                reference = dict()
+                reference['lambdas'] = [0.125100997994117,0.000948537402283]
+                reference['nu'] =  1.014388456747040
+                reference['score'] = -64.725400737218351
+                
+                for key in ['lambdas','nu','score']:
+                    np.testing.assert_almost_equal(reference[key],emb.summary[key][-1])
+                
 
 
 def _compare_models(F, y):

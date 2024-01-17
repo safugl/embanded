@@ -15,7 +15,167 @@ from ._torch_linalg_utils import matrix_centering
 
 
 class EMBanded:
-    """Expectation-Maximization algorithm for banded-type regression."""
+    """Expectation-Maximization algorithm for banded-type regression.
+
+
+    Parameters
+    ----------
+    hyper_params : Tuple[float, float, float, float], optional
+        Specify the hyperparameters related to the Inverse-Gamma priors
+        imposed on the lambda_j terms and on the nu terms. The inputs
+        should be a tuple in the form of (eta, tau, phi, kappa). The parameters
+        eta and tau are related to the priors imposed on the lambda_j terms, 
+        lambda_j ~ InvGamma(eta, tau). The parameters phi and kappa are related
+        to the priors imposed on the nu term, nu ~ InvGamma(phi, kappa).        
+        The default values are (1e-4, 1e-4, 1e-4, 1e-4).
+    max_iterations : int, optional
+        Specify the number of iterations. The default is 200.
+        
+
+    Attributes that control model specification
+    --------------------------------------------
+    set_verbose: bool, default=False
+        Verbose mode when fitting the model.
+    
+    set_multidimensional: bool, default=False
+        If set to False, the model will utilize vectorized code. In this case, 
+        y has to be a matrix of size [M x 1]. If set to True, the model will
+        utilize nested for loops. In this case, y can be a matrix of size
+        [M x P] for any P > 0. When y has multiple columns (i.e., P > 1), 
+        the model will make the simplifying assumptions described in the
+        Supplementary Material in the manuscript.
+    
+    set_lambdas_init: np.ndarray | None, default=None
+        Initialization parameters for lambda terms. If set to None, the model
+        will set the initial lambda parameters to np.ones(num_features). The
+        length must be equal to the number of predictor groups (i.e., len(F))
+    
+    set_nu_init: np.ndarray | None, default=None
+        Initialization parameters for the nu term. If set to None, the model
+        will set the initial nu parameter to 1.0.
+    
+    set_remove_intercept: bool, default=True
+        Whether to remove the offset from X and y before model fitting. If set
+        to True, the model will remove the offsets and use these offsets for
+        predictions.
+    
+    set_store_covariance_terms: bool, default=True
+        Whether to store Sigma. If set to True, then Sigma will be stored as
+        an attribute dictionary called covariance_terms with keys Sigma, 
+        Omega_inv, and Omega.
+    
+    set_smoothness_param: List[None | float], default=None
+        Specify the hyperparameter h_j related to the covariance 
+        parametrization of predictor group j. The length of the input list must
+        be equal to the number of predictor groups. When a given element is set
+        to None, then the Omega_j term will be a unit matrix. When a given
+        element in the list is a positive float, then the corresponding Omega_j
+        term will be parameterized with a Matern kernel.
+    
+    set_compute_score: bool, default=False
+        If set to True, estimate the log score at each iteration of the
+        optimization.
+    
+    set_early_stopping_tol: float | None, default=None
+        Stop the algorithm if increases in the log score are smaller than this
+        tolerance. When set to None, the algorithm will not terminate early. A
+        reasonable tolerance criterion is often: set_early_stopping_tol(1e-8).
+        
+        
+    Examples
+    --------
+    Simulate two predictor groups, X1 and X2. Specify that y contains a
+    mixed version of X1 but not X2. Set F as a list, F = [X1, X2],
+    and proceed to fit the model.
+
+        >>> import torch
+        >>> from embanded_torch import EMBanded
+
+        >>> device = torch.device('cuda'
+        >>>                       if torch.cuda.is_available() else 'cpu')
+
+        >>> dtype = torch.float64
+        >>> torch.manual_seed(0)
+        >>> F = [torch.randn(1000, 5, dtype=dtype, device=device),
+        >>>      torch.randn(1000, 10, dtype=dtype, device=device)]
+
+        >>> W1 = torch.hamming_window(5, dtype=dtype)[:, None].to(device)
+        >>> y = F[0]@W1 + torch.randn(1000, 1, dtype=dtype, device=device)
+        >>> emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+        >>>                max_iterations=200)
+        >>> emb.set_verbose(True)
+        >>> emb.fit(F, y)
+        >>> print('The estimated weights are:')
+        >>> print(torch.round(emb.W, decimals=1))
+
+
+    It is possible to let y have multiple columns, but in this case
+    one needs to specify emb.set_multidimensional(True).
+
+        >>> import torch
+        >>> import matplotlib.pyplot as plt
+        >>> from embanded_torch import EMBanded
+
+        >>> device = torch.device('cuda' if
+                              torch.cuda.is_available() else 'cpu')
+
+        >>> dtype = torch.float64
+        >>> torch.manual_seed(0)
+        >>> F = [torch.randn(1000, 5, dtype=dtype, device=device),
+        >>>      torch.randn(1000, 10, dtype=dtype, device=device)]
+
+        >>> W1 = torch.hamming_window(5, dtype=dtype)[:, None].to(device)
+        >>> y = torch.concatenate(
+        >>>     [F[0]@W1 + torch.randn(1000, 1,dtype=dtype,device=device),
+        >>>      torch.randn(1000, 1, dtype=dtype, device=device)], axis=1)
+        >>> emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+        >>>                max_iterations=200)
+        >>> emb.set_verbose(True)
+        >>> emb.set_multidimensional(True)
+        >>> emb.fit(F, y)
+        >>> print('The estimated weights are:')
+        >>> print(torch.round(emb.W, decimals=1))
+
+
+
+    One can assign smoothness parameters to each feature set. In the
+    following example, smoothness is specifically declared for the first
+    predictor group.
+
+        >>> from sklearn.linear_model import LinearRegression
+        >>> import torch
+        >>> import matplotlib.pyplot as plt
+        >>> from embanded_torch import EMBanded
+
+        >>> device = torch.device('cuda'
+        >>>                       if torch.cuda.is_available() else 'cpu')
+        >>> dtype = torch.float64
+        >>> torch.manual_seed(0)
+        >>> F = [torch.randn(1000, 100, dtype=dtype, device=device),
+        >>>      torch.randn(1000, 100, dtype=dtype, device=device)]
+
+        >>> X = torch.concatenate(F, axis=1)
+        >>> W = torch.zeros((200, 1), dtype=dtype, device=device)
+        >>> t = 50/200*torch.arange(100,dtype=dtype,device=device)
+        >>> W[:100] = torch.sin(t)[:, None]
+
+        >>> y = X@W + torch.randn(1000, 1, dtype=dtype, device=device)*5
+
+
+        >>> emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
+        >>>                max_iterations=200)
+        >>> emb.set_smoothness_param([15., None])
+        >>> emb.set_verbose(True)
+        >>> emb.fit(F, y)
+        >>> plt.plot(W.cpu().numpy(), label='target')
+        >>> plt.plot(emb.W.cpu().numpy(), label='emb')
+
+
+        >>> reg = LinearRegression().fit(X.cpu().numpy(), y.cpu().numpy())
+        >>> plt.plot(reg.coef_.ravel(), label='OLS', linewidth=0.4)
+        >>> plt.legend()
+
+    """
 
     def __init__(
         self,
@@ -30,8 +190,12 @@ class EMBanded:
         hyper_params : Tuple[float, float, float, float], optional
             Specify the hyperparameters related to the Inverse-Gamma priors
             imposed on the lambda_j terms and on the nu terms. The inputs
-            should be a tuple in the form of (eta, tau, phi, kappa).
-            The default values are (1e-4, 1e-4, 1e-4, 1e-4)."
+            should be a tuple in the form of (eta, tau, phi, kappa). The 
+            parameters eta and tau are related to the priors imposed on the 
+            lambda_j terms, lambda_j ~ InvGamma(eta, tau). The parameters phi 
+            and kappa are related to the priors imposed on the nu term,
+            nu ~ InvGamma(phi, kappa).        
+            The default values are (1e-4, 1e-4, 1e-4, 1e-4).
         max_iterations : int, optional
             Specify the number of iterations. The default is 200.
 
@@ -41,104 +205,6 @@ class EMBanded:
             The hyper parameters should be specified as a tuple of length four.
         ValueError
             The hyper parameters should be positive floats.
-
-
-        Examples
-        --------
-        Simulate two predictor groups, X1 and X2. Specify that y contains a
-        mixed version of X1 but not X2. Set F as a list, F = [X1, X2],
-        and proceed to fit the model.
-
-            >>> import torch
-            >>> from embanded_torch import EMBanded
-
-            >>> device = torch.device('cuda'
-            >>>                       if torch.cuda.is_available() else 'cpu')
-
-            >>> dtype = torch.float64
-            >>> torch.manual_seed(0)
-            >>> F = [torch.randn(1000, 5, dtype=dtype, device=device),
-            >>>      torch.randn(1000, 10, dtype=dtype, device=device)]
-
-            >>> W1 = torch.hamming_window(5, dtype=dtype)[:, None].to(device)
-            >>> y = F[0]@W1 + torch.randn(1000, 1, dtype=dtype, device=device)
-            >>> emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-            >>>                max_iterations=200)
-            >>> emb.set_verbose(True)
-            >>> emb.fit(F, y)
-            >>> print('The estimated weights are:')
-            >>> print(torch.round(emb.W, decimals=1))
-
-
-        It is possible to let y have multiple columns, but in this case
-        one needs to specify emb.set_multidimensional(True).
-
-            >>> import torch
-            >>> import matplotlib.pyplot as plt
-            >>> from embanded_torch import EMBanded
-
-            >>> device = torch.device('cuda' if
-                                  torch.cuda.is_available() else 'cpu')
-
-            >>> dtype = torch.float64
-            >>> torch.manual_seed(0)
-            >>> F = [torch.randn(1000, 5, dtype=dtype, device=device),
-            >>>      torch.randn(1000, 10, dtype=dtype, device=device)]
-
-            >>> W1 = torch.hamming_window(5, dtype=dtype)[:, None].to(device)
-            >>> y = torch.concatenate(
-            >>>     [F[0]@W1 + torch.randn(1000, 1,dtype=dtype,device=device),
-            >>>      torch.randn(1000, 1, dtype=dtype, device=device)], axis=1)
-            >>> emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-            >>>                max_iterations=200)
-            >>> emb.set_verbose(True)
-            >>> emb.set_multidimensional(True)
-            >>> emb.fit(F, y)
-            >>> print('The estimated weights are:')
-            >>> print(torch.round(emb.W, decimals=1))
-
-
-
-        One can assign smoothness parameters to each feature set. In the
-        following example, smoothness is specifically declared for the first
-        predictor group.
-
-            >>> from sklearn.linear_model import LinearRegression
-            >>> import torch
-            >>> import matplotlib.pyplot as plt
-            >>> from embanded_torch import EMBanded
-
-            >>> device = torch.device('cuda'
-            >>>                       if torch.cuda.is_available() else 'cpu')
-            >>> dtype = torch.float64
-            >>> torch.manual_seed(0)
-            >>> F = [torch.randn(1000, 100, dtype=dtype, device=device),
-            >>>      torch.randn(1000, 100, dtype=dtype, device=device)]
-
-            >>> X = torch.concatenate(F, axis=1)
-            >>> W = torch.zeros((200, 1), dtype=dtype, device=device)
-            >>> t = 50/200*torch.arange(100,dtype=dtype,device=device)
-            >>> W[:100] = torch.sin(t)[:, None]
-
-            >>> y = X@W + torch.randn(1000, 1, dtype=dtype, device=device)*5
-
-
-            >>> emb = EMBanded(hyper_params=(1e-4, 1e-4, 1e-4, 1e-4),
-            >>>                max_iterations=200)
-            >>> emb.set_smoothness_param([15., None])
-            >>> emb.set_verbose(True)
-            >>> emb.fit(F, y)
-            >>> plt.plot(W.cpu().numpy(), label='target')
-            >>> plt.plot(emb.W.cpu().numpy(), label='emb')
-
-
-            >>> reg = LinearRegression().fit(X.cpu().numpy(), y.cpu().numpy())
-            >>> plt.plot(reg.coef_.ravel(), label='OLS', linewidth=0.4)
-            >>> plt.legend()
-
-
-
-
 
         """
         if isinstance(hyper_params, tuple) is not True:
@@ -162,6 +228,7 @@ class EMBanded:
         self.smoothness_param = None
         self.num_features = None
         self.compute_score = False
+        self.early_stopping_tol = None
 
         # Initialize relevant terms
         self.X_offset = None
@@ -246,6 +313,7 @@ class EMBanded:
                     self.max_iterations,
                     mat_indexer, Omega_inv,
                     self.compute_score,
+                    self.early_stopping_tol,
                     self.verbose)
             )
 
@@ -263,6 +331,7 @@ class EMBanded:
                     self.max_iterations,
                     mat_indexer, Omega_inv,
                     self.compute_score,
+                    self.early_stopping_tol,
                     self.verbose)
             )
 
@@ -351,3 +420,10 @@ class EMBanded:
         """Specify if log objective should be computed"""
         check_boolean(val)
         self.compute_score = val
+
+    def set_early_stopping_tol(self, val: float | None) -> None:
+        """Specify tolerance for early stopping"""
+        if val:
+            check_positive_float(val)
+            self.set_compute_score(True)
+        self.early_stopping_tol = val

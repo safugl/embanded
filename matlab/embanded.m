@@ -7,6 +7,7 @@ function [W, summary] = embanded(F,y,opts)
 % data prior to model fitting.
 %
 % Parameters:
+%
 %   F: cell array
 %      A cell array of size (1 x J) where J is the number of feature spaces.
 %      Each cell must contain numeric arrays. These arrays should have
@@ -20,72 +21,79 @@ function [W, summary] = embanded(F,y,opts)
 %      number of rows in each entry in F. With multiple outcome variables,
 %      i.e., P>1, one must set opts.multi_dimensional = True.
 %   opts: struct
-%      A struct that is used to specify options.
+%      A struct that is used to specify options. See below.
 %
 % Options related to hyperparameters:
 %
-%   max_iterations: integer, default = 200
-%      Specify the maximum allowed number of iterations.
-%   nu: float, default = 1
-%      Specify the initial value of the nu hyperparameter which controls
-%      observation noise variance.
-%   lambdas: row vector, default = ones(1,num_features)
-%      Specify the initial values of the lambdas hyperparameters. The length
-%      of lambda must be equal to length(F)
-%   tau: float, default = 1e-4
-%      Specify hyperparameter tau related to the Inverse-Gamma priors imposed
-%      on the lambda_j terms.
 %   eta: float, default = 1e-4
-%      Specify hyperparameter eta related to the Inverse-Gamma priors imposed
-%      on the lambda_j terms.
+%      Specify hyperparameter eta related to the Inverse-Gamma priors 
+%      imposed on the lambda_j terms where lambda_j ~ InvGamma(eta, tau).
+%   tau: float, default = 1e-4
+%      Specify hyperparameter tau related to the Inverse-Gamma priors 
+%      imposed on the lambda_j terms where lambda_j ~ InvGamma(eta, tau).
 %   phi: float, default = 1e-4
-%      Specify hyperparameter phi related to the Inverse-Gamma prior imposed
-%      on the nu term.
+%      Specify hyperparameter phi related to the Inverse-Gamma priors 
+%      imposed on the nu term where nu ~ InvGamma(phi, kappa).
 %   kappa: float, default = 1e-4
-%      Specify hyperparameter kappa related to the Inverse-Gamma prior imposed
-%      on the nu term.
+%      Specify hyperparameter kappa related to the Inverse-Gamma priors 
+%      imposed on the nu term where nu ~ InvGamma(phi, kappa).
 %   h: row vector, default = nan(1,length(F)) (implying no smoothness)
 %      Specify the hyperparameter h related to the covariance parametrization.
 %      It is possible to define opts.h = [1, nan], in which case the first
 %      Omega_1 term will be parameterized with a Matern kernel, and the
 %      Omega_2 term will be a unit matrix. Entries with nan translates to
 %      identity matrices associated with the corresponding group of
-%      weights.
+%      weights. Entries that are not nan has to be positive floats.
+% 
+% Option related to stopping criteria: 
+%
+%   max_iterations: integer, default = 200
+%      Specify the maximum allowed number of iterations.
+%   early_stopping_tol : float | [], default = []
+%      Stop the algorithm if increases in the log score are smaller than this
+%      tolerance. When set to [], the algorithm will not terminate early. A
+%      reasonable tolerance criterion is often: early_stopping_tol = 1e-8.
+%
+% Options related to hyperparameter initialization:
+%
+%   nu: float, default = 1
+%      Specify the initial value of the nu hyperparameter which controls
+%      observation noise variance.
+%   lambdas: row vector, default = ones(1,num_features)
+%      Specify the initial values of the lambdas hyperparameters. The length
+%      of lambda must be equal to length(F)
+%
 %
 % Optional options:
 %
 %   show_progress: bool, default=true
 %      Whether to show progress and time elapsed.
-%   covX: matrix of shape (num_predictors, num_predictors)
+%   multi_dimensional : bool, default=false
+%      If set to false, the model will utilize vectorized code. In this case, 
+%      y has to be a matrix of size [M x 1]. If set to True, the model will
+%      utilize nested for loops. In this case, y can be a matrix of size
+%      [M x P] for any P > 1. When y has multiple columns (i.e., P > 1), 
+%      the model will make the simplifying assumptions described in the
+%      Supplementary Material in the manuscript.
+%   use_matrix_inversion_lemma: boolean, default = false
+%      Specify whether the Woodbury Matrix Identity should be used for
+%      computing the inverse of Sigma.
+%   remove_intercept : bool, default=false
+%      Whether to remove the offset from X and y before model fitting. If set
+%      to true, the model will remove the offsets and store the offsets
+%      will in summary as X_offset and y_offset. These values should
+%      be used for the model predictions.
+%   device : string, default=[]
+%      Set device = 'gpu' to allow for GPU computing.
+%   store_Sigma : bool, default=false
+%      Whether to store Sigma.
+%   compute_score : bool, default=false
+%      If set to true, estimate the log score at each iteration of the
+%      optimization.
+%   covX: array | [], default = []
 %      This is an advanced option that allows the user to pre-compute X'*X.
 %      It is important to ensure that covX is computed appropriately with
 %      the correct predictors.
-%   use_matrix_inversion_lemma: boolean, default = false
-%      Specify whether the Woodbury Matrix Identity should be used for
-%      computing inv(Sigma).
-%   remove_intercept : bool, default=false
-%      Whether to remove offsets in X and Y prior to fitting the model. If set
-%      to false, the data will not be transformed prior to model fitting.
-%      However, in this case, the model will complain if the columns in X or y
-%      have not been adequately centered. If set to true, then the offsets
-%      will be stored in summary as X_offset and y_offset. These values will
-%      be used for the model predictions.
-%   multi_dimensional : bool, default=false
-%      Whether to make simplifying assumptions to allow for an efficient
-%      estimation of weights in cases where y has multiple columns.
-%   device : string, default=[]
-%      Set device = 'gpu' to allow for GPU computing (requires
-%      Parallel Computing Toolbox). When set to empty (default) this will
-%      not be used.
-%   store_Sigma : bool, default=false
-%      Whether or not to store Sigma.
-%   compute_score : bool, default=false
-%      Whether or not to compute and store the objective function in the
-%      summary struct as summary.score.  
-%   early_stopping_tol : float, default = []
-%      Stop early if increases in the objective function are smaller than
-%      this tolerance value. For example, use: early_stopping_tol = 1e-11
-%
 %
 % How to transform data and ensure that each column has zero-mean?
 % Simulate some regressors
@@ -98,24 +106,28 @@ function [W, summary] = embanded(F,y,opts)
 % Option 2: Using bsxfun to subtract the mean and get a centered version of X
 % C = bsxfun(@minus, X, mean(X));
 %
-% Option 3: Using bsxfun to subtract the mean and divide by the maximum of the standard deviation and a small value
+% Option 3: Using bsxfun to subtract the mean and divide by the maximum 
+% of the standard deviation and a small value:
 % D = bsxfun(@rdivide, bsxfun(@minus, X, mean(X)), max(std(X), 1e-10));
 
 
 
 if nargin < 3 || isempty(opts); opts = struct; end
 
-% Options related to hyperparameter seeds:
-if isfield(opts,'nu')==0; opts.nu = 1; end
-if isfield(opts,'lambdas')==0; opts.lambdas = ones(1,size(F,2)); end
+% Options related to hyperparameters:
 if isfield(opts,'h')==0; opts.h = []; end
 if isfield(opts,'tau')==0; opts.tau = 1e-4; end
 if isfield(opts,'eta')==0; opts.eta = 1e-4; end
 if isfield(opts,'phi')==0; opts.phi = 1e-4; end
 if isfield(opts,'kappa')==0; opts.kappa = 1e-4; end
 
+% Options related to hyperparameter initialization:
+if isfield(opts,'nu')==0; opts.nu = 1; end
+if isfield(opts,'lambdas')==0; opts.lambdas = ones(1,size(F,2)); end
+
 % Options related to stopping criteria:
 if isfield(opts,'max_iterations')==0; opts.max_iterations = 200; end
+if isfield(opts,'early_stopping_tol')==0; opts.early_stopping_tol = []; end
 
 % Optional options:
 if isfield(opts,'covX')==0; opts.covX = []; end
@@ -126,8 +138,6 @@ if isfield(opts,'store_Sigma')==0; opts.store_Sigma = false; end
 if isfield(opts,'use_matrix_inversion_lemma')==0; opts.use_matrix_inversion_lemma = false; end
 if isfield(opts,'device')==0; opts.device = []; end
 if isfield(opts,'compute_score')==0; opts.compute_score = false; end
-if isfield(opts,'early_stopping_tol')==0; opts.early_stopping_tol = []; end
-
 
 
 summary = struct;

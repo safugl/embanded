@@ -102,7 +102,26 @@ def prepare_smoothness_cov(F, smoothness_param,
 
 def compute_covariance(nu, covX, lambdas_diag,
                        Omega_inv=None, compute_score=False):
-    """Compute inv( 1/nu  X.T X + L Omega_inv) as well as logdet."""
+    """Compute inv( 1/nu  X.T X + L Omega_inv) as well as logdet.
+
+    Example
+    -------
+    Below, we provide covX on the following form
+        tensor([[16.4331,  1.1891,  3.6651],
+                [ 1.1891,  7.9407,  2.0888],
+                [ 3.6651,  2.0888, 13.1385]], dtype=torch.float64)
+    
+        
+    torch.manual_seed(0)
+    X = torch.randn(10,3,dtype=torch.float64)
+    covX = X.T@X
+    lambdas_diag = torch.rand(3,dtype=torch.float64)
+    nu = 1.
+    Sigma, logdet = compute_covariance(nu, covX, lambdas_diag, None, True)
+    Sigma_ref = torch.linalg.inv(covX + torch.diag(1./lambdas_diag))
+    torch.testing.assert_close(Sigma, Sigma_ref)
+    torch.testing.assert_close(logdet,torch.log(torch.linalg.det(Sigma_ref)))
+    """
 
     if Omega_inv is not None:
         # Case with smoothness prior
@@ -126,6 +145,7 @@ def fit_model_vectorized(X, y,
                          mat_indexer,
                          Omega_inv,
                          compute_score,
+                         early_stopping_tol,
                          verbose):
     """Fit a model and assume that y is 1D."""
     if verbose is True:
@@ -204,6 +224,14 @@ def fit_model_vectorized(X, y,
                 - kappa / nu
             )
 
+            if early_stopping_tol:
+                if iteration > 1:
+                    score_diff = (
+                        summary["score"][iteration] -
+                        summary["score"][iteration-1])
+                    if score_diff < early_stopping_tol:
+                        break
+
         if iteration < max_iterations-1:
 
             # Update the lambdas.
@@ -225,6 +253,11 @@ def fit_model_vectorized(X, y,
             time_elapsed = time.time()-start_time
             print(f'Time elapsed: {time_elapsed}')
 
+    if early_stopping_tol:
+        summary['lambdas'] = summary['lambdas'][:iteration+1, :]
+        summary['nu'] = summary['nu'][:iteration+1]
+        summary['score'] = summary['score'][:iteration+1]
+
     return W, summary, Sigma
 
 
@@ -235,6 +268,7 @@ def fit_model_multidimensional(X, y,
                                mat_indexer,
                                Omega_inv,
                                compute_score,
+                               early_stopping_tol,
                                verbose):
     """Muldimensional model fit with- or without smoothness."""
     if verbose is True:
@@ -324,6 +358,14 @@ def fit_model_multidimensional(X, y,
                 - kappa / nu
             )
 
+            if early_stopping_tol:
+                if iteration > 1:
+                    score_diff = (
+                        summary["score"][iteration] -
+                        summary["score"][iteration-1])
+                    if score_diff < early_stopping_tol:
+                        break
+
         if iteration < max_iterations-1:
 
             # In this case we also have to iterate over feature groups
@@ -380,5 +422,10 @@ def fit_model_multidimensional(X, y,
             print(f'At iteration {iteration} of {max_iterations}')
             time_elapsed = time.time()-start_time
             print(f'Time elapsed: {time_elapsed}')
+
+    if early_stopping_tol:
+        summary['lambdas'] = summary['lambdas'][:iteration+1, :]
+        summary['nu'] = summary['nu'][:iteration+1]
+        summary['score'] = summary['score'][:iteration+1]
 
     return W, summary, Sigma

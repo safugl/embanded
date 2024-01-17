@@ -39,7 +39,7 @@ for k, param in enumerate([1e-4, 1e-3, 1e-2, 1e-1]):
                    max_iterations=200)
 
     # Fit the model
-    summary = emb.fit(F, y)
+    emb.fit(F, y)
 
     # Plot the estimated weights for this parameter
     ax[0, k].plot(emb.W.cpu().numpy(), '-k')
