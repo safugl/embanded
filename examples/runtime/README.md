@@ -44,7 +44,7 @@ EMB4 (Matlab) | 0.01556 s | 0.06395
 In this example, we explore a scenario with a moderate number of predictors (128 predictors) and an increasing number of observations. The simulations involve two predictor groups, F1 and F2, each containing 64 predictors. The target variable y is assumed to be a mixed version of F1 plus additive Gaussian noise. We monitor the runtime for simulations with varying numbers of observations, ranging from 128 samples to 65536 samples. Notice that the EM-banded models with early stopping (EMB2 and EMB4) requires computation of log-score unlike EMB1 and EMB3.
 
 Model |  128 samples |  1024 samples |  16384 samples |  65536 samples |  
-:-|:-|:-|:-|:-|:-|:-
+:-|:-|:-|:-|:-
 EMB1 |  0.08121 s |  0.09512 s |  0.35699 s |  1.30781 s |  
 EMB2 |  0.09065 s |  0.09110 s |  0.08192 s |  0.25147 s |  
 EMB3 |  0.09265 s |  0.10532 s |  0.35106 s |  1.28950 s |  
@@ -63,7 +63,7 @@ LassoCV |  0.79701 s |  0.10971 s |  0.43248 s |  1.63593 s |
 This example is an extension of Example 02. In this case, we use the PyTorch implementation and fit models with an increasing number of predictors. We once again assume a scenario with two predictor groups, F1 and F2, and one target variable. In this case, we assume 65536 observations, but here increase the number of predictors (number of dimensions) from 128 to 8192. Timing is reported below with float64 precision.
 
 Model |  128 dimensions |  512 dimensions |  1024 dimensions |  2048 dimensions |  
-:-|:-|:-|:-|:-|:-
+:-|:-|:-|:-|:-
 EMB1 (PyTorch) |  0.24352 s |  1.26022 s |  3.79259 s |  16.35053 s |  
 EMB2 (PyTorch) |  0.04665 s |  0.32395 s |  1.25555 s |  7.60263 s |  
 EMB3 (PyTorch) |  0.27069 s |  1.20210 s |  3.69885 s |  16.12053 s |  
@@ -72,7 +72,7 @@ EMB4 (PyTorch) |  0.04390 s |  0.32252 s |  1.24672 s |  7.46866 s |
 This procedure is repeated and shown below with float32 precision.
 
 Model |  128 dimensions |  512 dimensions |  1024 dimensions |  2048 dimensions |  
-:-|:-|:-|:-|:-|:-
+:-|:-|:-|:-|:-
 EMB1 (PyTorch) |  0.15383 s |  0.32976 s |  0.85559 s |  2.67104 s |  
 EMB2 (PyTorch) |  0.01956 s |  0.04177 s |  0.11915 s |  0.46552 s |  
 EMB3 (PyTorch) |  0.21036 s |  0.32482 s |  0.80547 s |  2.58599 s |  
