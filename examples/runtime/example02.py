@@ -6,10 +6,23 @@ import compare_models
 import pandas as pd
 
 
-keys = ['EMB1', 'EMB2', 'EMB3', 'EMB4', 'RidgeCV1', 'RidgeCV2', 'RidgeCV3',
-        'ARD', 'BRR', 'OLS', 'LassoCV']
+keys = ['EMB1', 'EMB2', 'EMB3', 'EMB4', 'RidgeCV1',
+        'RidgeCV2', 'RidgeCV3', 'ARD', 'BRR', 'OLS', 'LassoCV',
+        'GroupRidgeCV1', 'GroupRidgeCV2']
 
 sweep = [128, 1024, 16384, 65536]
+
+# We are not interested in utilizing GroupRidgeCV1 and GroupRidgeC2 with many
+# samples in this case.
+max_samples = dict()
+for key in keys:
+    if key == 'GroupRidgeCV1':
+        max_samples[key] = 16384
+    elif key == 'GroupRidgeCV2':
+        max_samples[key] = 128
+    else:
+        max_samples[key] = 65536
+
 
 df = []
 
@@ -39,12 +52,18 @@ for num_samples in sweep:
     print('Number of samples: %i' % num_samples)
 
     for key in keys:
-        start = time.time()
-        if 'EMB' in key:
-            W_i = compare_models.fit_model(key, F, y[:, None])
+        time_elapsed_i = 0
+
+        if num_samples > max_samples[key]:
+            time_elapsed_i = np.nan
         else:
-            W_i = compare_models.fit_model(key, X, y)
-        time_elapsed_i = time.time() - start
+            start = time.time()
+            if ('EMB' in key) or ('GroupRidge' in key):
+                W_i = compare_models.fit_model(key, F, y[:, None])
+            else:
+                W_i = compare_models.fit_model(key, X, y)
+            time_elapsed_i = time.time() - start
+
         df.append(dict(num_samples=num_samples,
                   model=key,
                   time_elapsed=time_elapsed_i))
@@ -56,7 +75,7 @@ print('Model | ', end=' ')
 for num_samples in sweep:
     print('%i samples | ' % num_samples, end=' ')
 print('')
-print(':-|:-|:-|:-|:-|:-|:-')
+print(':-|:-|:-|:-|:-')
 for key in keys:
     print('%s | ' % key, end=' ')
     for num_samples in sweep:

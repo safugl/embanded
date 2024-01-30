@@ -14,28 +14,31 @@ Create a conda environment, for example, by using `conda create -n embanded pyth
 
 Follow the example scripts available [here](examples/python). 
 
-## 3. Examples 
+## 3. Runtime tests
+Please see [here](examples/runtime/) for runtime tests. 
+
+## 4. Examples 
 - Matlab example scripts are available [here](examples/matlab/).
 - Python scripts are available [here](examples/python/).
 A few additional examples are highlighted below. 
 
-### 3.1. Simulation example with Python
+### 4.1. Simulation example with Python
 This example uses synthetic data. Several models are fit to the data using scikit-learn [6,7]. The below figure shows the target weights (black) along with the estimated weights for each estimator. The top left panel shows estimate with EM-banded. The script is available [here](examples/python/example_sklearn_02.py).
 
 <img title="simulated_data" alt="simulated_data" src="./examples/python/example_sklearn_02.png">
 
-### 3.2. Simulation example with Python
+### 4.2. Simulation example with Python
 This example uses a synthetic dataset created by [5] for scikit-learn. An EM-banded model is fit to the data. Separate regularization hyperparameters are declared to each predictor. The figure below has been modified from the tutorial described by [5]. It now also includes weights estimated by two EM-banded estimators. The modified script is available [here](examples/python/example_sklearn_01.py).
 
 <img title="sklearn-tutorial" alt="sklearn-tutorial data" src="./examples/python/example_sklearn_01.png">
 
-### 3.3. EEG encoding example with Matlab
+### 4.3. EEG encoding example with Matlab
 This example illustrates how to use the model for estimating temporal response functions from electroencephalography (EEG) data. The data used for this example is publicly available and was originally described in [4]. The example imports epoched EEG data and envelope features and fits regression models to data from each participant. The scripts relies on a [function](matlab/functions/timelag.m) for augmenting the stimulus feature with multiple time lags. The script is available [here](examples/matlab/example_eeg_encoding.m).
 
-### 3.4. Decoding example using synthetic data with Matlab
+### 4.4. Decoding example using synthetic data with Matlab
 This example uses a synthetic data set to fit a decoding model. The example simulates an envelope and multi-channel response data that contains a mixed version of the envelope. The script fits two different EM-banded decoding models and one Ridge decoding model. The models are used to predict held-out data. The scripts relies on a [function](matlab/functions/timelag.m) for augmenting the responses with multiple time lags. The script is available [here](examples/matlab/example_simulation_decoding.m).
 
-## 4. References
+## 5. References
 1. Fuglsang, S. A., Madsen, K. H., Puonti, O., Siebner, H. R., Hjortkjær J. (2023) Exploring an EM-algorithm for banded regression in computational neuroscience. Available at: https://doi.org/10.1101/2023.09.22.558945 
 2. ﻿Nunez-Elizalde AO, Huth AG, Gallant JL (2019) Voxelwise encoding models with non-spherical multivariate normal priors. Neuroimage 197:482–492 Available at: https://doi.org/10.1016/j.neuroimage.2019.04.012.
 3. Dupré la Tour T, Eickenberg M, Nunez-Elizalde AO, Gallant JL (2022) Feature-space selection with banded ridge regression. Neuroimage 264. Available at: https://doi.org/10.1016/j.neuroimage.2022.119728

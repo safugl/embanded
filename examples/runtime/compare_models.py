@@ -7,7 +7,7 @@ from sklearn.linear_model import (
 )
 from embanded.embanded_numpy import EMBanded
 from embanded.embanded_torch import EMBanded as EMBanded_torch
-
+from himalaya.ridge import GroupRidgeCV
 
 def fit_model(key, X, y):
     """Use this for comparing runtime."""
@@ -15,7 +15,7 @@ def fit_model(key, X, y):
 
     est = []
 
-    if 'EMB' in key:
+    if ('EMB' in key) or ('GroupRidge' in key):
         y = copy.deepcopy(y)
     else:
         y = copy.deepcopy(y).ravel()
@@ -112,5 +112,28 @@ def fit_model(key, X, y):
         est.set_early_stopping_tol(1e-8)
         est.fit(X, y)
         W = est.W
+
+    elif key == 'GroupRidgeCV1':
+        # GroupRidgeCV1
+        est = GroupRidgeCV(groups="input",
+                           random_state=0,
+                           fit_intercept=True,
+                           Y_in_cpu=True,
+                           force_cpu=True,
+                           solver_params = dict(progress_bar=False))
+        est.fit(X,y)
+        W = est.coef_
+    elif key == 'GroupRidgeCV2':
+        # GroupRidgeCV2
+        est = GroupRidgeCV(groups="input",
+                           random_state=0,
+                           fit_intercept=True,
+                           Y_in_cpu=True,
+                           force_cpu=True,
+                           solver_params = dict(progress_bar=False,
+                                                alphas=np.logspace(-10, 10, 21),
+                                                n_iter=1000))
+        est.fit(X,y)
+        W = est.coef_
 
     return W

@@ -26,7 +26,8 @@ X, y, true_weights = make_regression(
 
 num_iter = 10
 keys = ['EMB1', 'EMB2', 'EMB3', 'EMB4', 'RidgeCV1',
-        'RidgeCV2', 'RidgeCV3', 'ARD', 'BRR', 'OLS', 'LassoCV']
+        'RidgeCV2', 'RidgeCV3', 'ARD', 'BRR', 'OLS', 'LassoCV',
+        'GroupRidgeCV1', 'GroupRidgeCV2']
 
 time_elapsed = dict()
 loss = dict()
@@ -49,7 +50,7 @@ for iteration in range(num_iter):
 
     for key in keys:
         start = time.time()
-        if 'EMB' in key:
+        if ('EMB' in key) or ('GroupRidge' in key):
             W_i = compare_models.fit_model(key, F, y[:, None])
         else:
             W_i = compare_models.fit_model(key, X, y)
