@@ -42,11 +42,11 @@ def matrix_inv_cholesky(A,compute_logdet=False):
     np.testing.assert_allclose(d,np.log(np.linalg.det(B)))
     """
     if not isinstance(A, np.ndarray):
-        raise TypeError('{A} must be a positive definite, symmetric matrix')
+        raise TypeError('{A} must have size (D x D)')
     if not A.ndim == 2:
-        raise TypeError('{A} must be a positive definite, symmetric matrix')
+        raise TypeError('{A} must have size (D x D)')
     if not A.shape[0] == A.shape[1]:
-        raise TypeError('{A} must be a positive definite, symmetric matrix')
+        raise TypeError('{A} must have size (D x D)')
     L = cho_factor(A, lower=True, overwrite_a=False, check_finite=False)
     O = cho_solve(L, np.eye(A.shape[1], dtype=A.dtype),
                      overwrite_b=False,
@@ -171,15 +171,15 @@ def matrix_blockdiag_rotation(A, mat_indexer, B=None):
         O = np.power(A,2).T@ mat_indexer
     """
     if not isinstance(A, np.ndarray):
-        raise TypeError('{A} must be a vector of size (M X 1)')
+        raise TypeError('{A} must have size (D X 1)')
     if not A.shape[1] == 1:
-        raise TypeError('{A} must have size (M X 1)')
+        raise TypeError('{A} must have size (D X 1)')
 
     if B is not None:
         if not isinstance(B, np.ndarray):
-            raise TypeError('{B} must be a vector of size (M X M)')
+            raise TypeError('{B} must have size (D X D)')
         if not (A.shape[0], A.shape[0]) == B.shape:
-            raise TypeError('{B} must have size (M x M)')
+            raise TypeError('{B} must have size (D x D)')
         O = np.einsum('ij,jk->ik',
                       np.einsum('ji,jk->ik', A, B),
                       np.einsum('ji,jk->jk', A, mat_indexer))
@@ -240,15 +240,15 @@ def matrix_block_trace(A, mat_indexer, B=None):
     
     """
     if not isinstance(A, np.ndarray):
-        raise TypeError('{A} must be a vector of size (M X M)')
+        raise TypeError('{A} must have size (D X D)')
     if not A.shape[1] == A.shape[0]:
-        raise TypeError('{A} must have size (M X M)')
+        raise TypeError('{A} must have size (D X D)')
 
     if B is not None:
         if not isinstance(B, np.ndarray):
-            raise TypeError('{B} must be a vector of size (M X M)')
+            raise TypeError('{B} must have size (D X D)')
         if not (A.shape[0], A.shape[0]) == B.shape:
-            raise TypeError('{B} must have size (M x M)')
+            raise TypeError('{B} must have size (D x D)')
         O = np.einsum('ii,ij->j',
                       np.einsum('ik,kj->ij', A, B),
                       mat_indexer)

@@ -43,11 +43,11 @@ def matrix_inv_cholesky(A, compute_logdet=False):
     np.testing.assert_allclose(d,np.log(np.linalg.det(B)))
     """
     if not isinstance(A, torch.Tensor):
-        raise TypeError('{A} must be a positive definite, symmetric matrix')
+        raise TypeError('{A} must have size (D x D)')
     if not A.ndim == 2:
-        raise TypeError('{A} must be a positive definite, symmetric matrix')
+        raise TypeError('{A} must have size (D x D)')
     if not A.shape[0] == A.shape[1]:
-        raise TypeError('{A} must be a positive definite, symmetric matrix')
+        raise TypeError('{A} must have size (D x D)')
     L = torch.linalg.cholesky(A)  # pylint: disable=E1102
     O = torch.cholesky_inverse(L)
 
@@ -174,15 +174,15 @@ def matrix_blockdiag_rotation(A, mat_indexer, B=None):
     
     """
     if not isinstance(A, torch.Tensor):
-        raise TypeError('{A} must be a vector of size (M X 1)')
+        raise TypeError('{A} must have size (D X 1)')
     if not A.shape[1] == 1:
-        raise TypeError('{A} must have size (M X 1)')
+        raise TypeError('{A} must have size (D X 1)')
 
     if B is not None:
         if not isinstance(B, torch.Tensor):
-            raise TypeError('{B} must be a vector of size (M X M)')
+            raise TypeError('{B} must have size (D X D)')
         if not (A.shape[0], A.shape[0]) == B.shape:
-            raise TypeError('{B} must have size (M x M)')
+            raise TypeError('{B} must have size (D x D)')
         O = torch.einsum('ij,jk->ik',
                          torch.einsum('ji,jk->ik', A, B),
                          torch.einsum('ji,jk->jk', A, mat_indexer))
@@ -250,15 +250,15 @@ def matrix_block_trace(A, mat_indexer, B=None):
          
     """
     if not isinstance(A, torch.Tensor):
-        raise TypeError('{A} must be a vector of size (M X M)')
+        raise TypeError('{A} must have size (D X D)')
     if not A.shape[1] == A.shape[0]:
-        raise TypeError('{A} must have size (M X M)')
+        raise TypeError('{A} must have size (D X D)')
 
     if B is not None:
         if not isinstance(B, torch.Tensor):
-            raise TypeError('{B} must be a vector of size (M X M)')
+            raise TypeError('{B} must have size (D X D)')
         if not (A.shape[0], A.shape[0]) == B.shape:
-            raise TypeError('{B} must have size (M x M)')
+            raise TypeError('{B} must have size (D x D)')
         O = torch.einsum('ii,ij->j',
                          torch.einsum('ik,kj->ij', A, B),
                          mat_indexer)
