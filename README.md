@@ -20,7 +20,8 @@ Please see [here](examples/runtime/) for runtime tests.
 ## 4. Examples 
 - Matlab example scripts are available [here](examples/matlab/).
 - Python scripts are available [here](examples/python/).
-A few additional examples are highlighted below. 
+
+A few additional examples are highlighted below. For the sake of transparency, we also illustrate the behavior of the EM-banded estimator in simulation scenarios developed by others (see section 4.2 and 4.3 below). 
 
 ### 4.1. Simulation example with Python
 This example uses synthetic data. Several models are fit to the data using scikit-learn [6,7]. The below figure shows the target weights (black) along with the estimated weights for each estimator. The top left panel shows estimate with EM-banded. The script is available [here](examples/python/example_sklearn_02.py).
@@ -28,14 +29,17 @@ This example uses synthetic data. Several models are fit to the data using sciki
 <img title="simulated_data" alt="simulated_data" src="./examples/python/example_sklearn_02.png">
 
 ### 4.2. Simulation example with Python
-This example uses a synthetic dataset created by [5] for scikit-learn. An EM-banded model is fit to the data. Separate regularization hyperparameters are declared to each predictor. The figure below has been modified from the tutorial described by [5]. It now also includes weights estimated by two EM-banded estimators. The modified script is available [here](examples/python/example_sklearn_01.py).
+This example uses a synthetic dataset created by [5] for scikit-learn. An EM-banded model is fit to the data. Separate regularization hyperparameters are declared to each predictor. The figure below has been modified from the tutorial found [here](https://scikit-learn.org/stable/auto_examples/linear_model/plot_ard.html#sphx-glr-auto-examples-linear-model-plot-ard-py). It now also includes weights estimated by two EM-banded estimators. The modified script is available [here](examples/python/example_sklearn_01.py).
 
 <img title="sklearn-tutorial" alt="sklearn-tutorial data" src="./examples/python/example_sklearn_01.png">
 
-### 4.3. EEG encoding example with Matlab
+### 4.3. Simulation example with Python
+The examples found [here](examples/python/grouplasso) show results from analyses where EM-banded models are fit to simulations developed by [10]. 
+
+### 4.4. EEG encoding example with Matlab
 This example illustrates how to use the model for estimating temporal response functions from electroencephalography (EEG) data. The data used for this example is publicly available and was originally described in [4]. The example imports epoched EEG data and envelope features and fits regression models to data from each participant. The scripts relies on a [function](matlab/functions/timelag.m) for augmenting the stimulus feature with multiple time lags. The script is available [here](examples/matlab/example_eeg_encoding.m).
 
-### 4.4. Decoding example using synthetic data with Matlab
+### 4.5. Decoding example using synthetic data with Matlab
 This example uses a synthetic data set to fit a decoding model. The example simulates an envelope and multi-channel response data that contains a mixed version of the envelope. The script fits two different EM-banded decoding models and one Ridge decoding model. The models are used to predict held-out data. The scripts relies on a [function](matlab/functions/timelag.m) for augmenting the responses with multiple time lags. The script is available [here](examples/matlab/example_simulation_decoding.m).
 
 ## 5. References
@@ -48,3 +52,4 @@ This example uses a synthetic data set to fit a decoding model. The example simu
 7. API design for machine learning software: experiences from the scikit-learn project. Buitinck et al., 2013. https://arxiv.org/abs/1309.0238
 8. Hunter, John D. "Matplotlib: A 2D graphics environment." Computing in science & engineering 9.03 (2007): 90-95.
 9. Waskom, Michael L. "Seaborn: statistical data visualization." Journal of Open Source Software 6.60 (2021): 3021.
+10. Moe, Yngve Mardal. "group-lasso 1.5.0."
